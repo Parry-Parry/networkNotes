@@ -92,3 +92,262 @@ _Refer to 01c for a diagram showing visual representations of modulation_
 _Example: 802.11b Wi-Fi uses spread spectrum using several frequencies centred at either 2.4 GHz or 5 GHz_
 
 **Physical Link Characteristics and Limitations**
+
+- Real-world network links are imperfect, and subject to noise
+
+_noise_ : Electrical or radio interference, imperfections in optical fibre
+
+- The Shannon-Hartley theorem predicts the maximum data rate of a channel subject to noise: R<sub>max</sub> = Blog<sub>2</sub>\(1 + s/n\)
+- _B_ : bandwidth of the channel 
+- _S_ : signal strength
+- _N_ : noise strength
+- Assuming Gaussian noise: interference affects all frequencies equally
+
+_Physical limit on maximum transmission rate_
+- B and N depend on properties of the channel
+- S depends on transmission power \-\> trade battery life for performance
+
+**The Data Link Layer**
+
+- Physical layer enables communication 
+- Data link layer provides framing, addressing, media access control 
+- Structure the bitstream into meaningful frames of data 
+- Detect and correct transmission errors 
+- Identify devices
+- Arbitrate access to the channel
+
+**Framing and Addressing**
+
+Separate the bitstream into meaningful frames of data
+
+_Refer to 01c for an example ethernet frame format_
+
+Preamble \-\- Source Address \-\- Destination Address \-\- Len \-\- Data \-\- CRC
+
+_CRC_ : Cycle Redundancy Check, error-detecting code commonly used in digital networks and storage devices to detect accidental changes to raw data
+
+**Media Access Control** : Control when frames are sent, to avoid collisions
+
+_Examples: Ethernet, Wi\-Fi_
+
+- When propagation delay low, listen before sending
+- If link is idle, send data immediately
+- If another transmission is active, or if collision occurs, stop sending, wait, then retransmit 
+
+- Wait time should be random – to avoid deterministic repeated collisions; pick a random initial back-off interval of x seconds ± 50%
+- Wait time should increase with number of collisions – repeated collisions signal congestion; reduce transmission rate allows network to recover; each repeated collision before success, x \-\> 2x
+
+_Improves utilisation_
+- Active transmissions not disrupted by collisions
+- Only the new sender backs-off if the channel is active
+
+_Why does propagation delay matter?_
+
+A \-\-\> <\-\- B
+
+- A starts transmitting
+- B listens, hears no traffic \(message from A hasn’t reached it yet\)
+- B starts transmitting
+
+_Collision occurs, as messages overlap in transit; smaller propagation delay \-\> less likely to occur_
+
+**The Network Layer as an Internet Protocol**
+
+- Global inter-networking protocol 
+
+**Hour glass protocol stack**
+
+**Application Presentation** : MIME, HTML, SDP, Codecs
+
+**Session** : SMTP, HTTP, SIP, RTP
+
+**Transport** : TCP, UDP
+
+**Network** : IP
+
+**Data Link** : Ethernet, ADSL, Wi\-Fi, SONET
+
+**Physical** : Wireless, Twisted pair, Optical Fibre
+
+**IP** : Single standard network layer protocol
+- Packet switched network, best effort service 
+- Uniform network and host addressing 
+- Uniform end-to-end connectivity \- subject to firewall policy
+
+- Many transport & application layer protocols 
+- Range of link-layer technologies supported 
+- Decouples end-to-end functionality from per-hop functionality
+
+**End\-to\-end functionality**: when an application performs specific tasks from start to finish,
+
+**Per-hop functionality** : a network solution aimed at classifying the IP traffic flow into traffic classes. It uses six bits, called DiffServ Code Point 
+
+_DiffServ_ : a computer networking architecture that specifies a simple and scalable mechanism for classifying and managing network traffic
+
+**IPv4**
+- 32 bit addresses insufficient
+- Fragmentation difficult at high data rates
+- Limited extensibility
+
+**IPv6**
+- Larger address space
+- No in-network fragmentation
+- No unnecessary checksum 
+- Simpler header format
+
+_fragmentation_ : process that breaks packets into smaller pieces (fragments), so that the resulting pieces can pass through a link with a smaller maximum transmission unit (MTU) than the original packet size
+
+_checksum_ : a small-sized block of data derived from another block of digital data for the purpose of detecting errors that may have been introduced during its transmission or storage
+
+**What About IPv5?**
+- Experiments with voice over the ARPAnet \- the precursor to the Internet \- started in the early 1970s
+- **Network Voice Protocol** : network protocol for transporting human speech over packetized communications networks
+- This evolved into the Internet Stream Protocol, ST-II, that was assigned IPv5 – an experimental multimedia streaming protocol developed between 1979 and 1995, but never widely deployed
+- **ST-II+ specification** : distinguishes its own packets with an Internet Protocol version number 5, uses the same IP address structure and the same link layer protocol number as IP
+
+**IP Addressing**
+- IP addresses encode location of network interface
+- If a host has multiple network interfaces \(e.g., Wi-Fi and Ethernet\), it will have multiple IP addresses
+- A host can support both IPv4 and IPv6 on each interface
+- A host can have multiple IP addresses of each type assigned to each interface
+
+_DNS names are an application concept \- not used by the network_
+
+_Domain Name System_ :  translates human readable domain names \(for example, www.amazon.com \) to machine readable IP addresses \(for example, 192.0. 2.44\).
+
+**Routing**
+- Each network administered separately - an autonomous system \(AS\)
+- Different technologies
+- Different policies
+- Mutual distrust \- between AS and its peers; between AS and its customers
+
+**Autonomous Systems and Inter-domain Routing**
+- Separately administered; different technologies
+- Shortest path routing
+- Distance vector or link state algorithms
+
+**Inter-domain Routing and BGP**
+- Treats each network as a graph node and routes between ASes 
+
+_The AS-level topology:_
+- Well connected core; sparse edges 
+- Edge networks can use default route to the core
+- Core networks need full routing table: the default free zone \(DFZ\) 
+
+_Routing between competitors \- no real trust between organisations_
+- Policy, politics, and economics are key constraints; not shortest path
+- **BGP routing protocol** : a standardized exterior gateway protocol designed to exchange routing and reachability information between autonomous systems on the Internet
+
+**Forwarding**
+- Best effort, connectionless, packet delivery 
+- Just send \- no need to setup a connection first
+- Network makes its best effort to deliver packets, but provides no guarantees 
+- Time taken to transit the network may vary 
+- Packets may be lost, delayed, reordered, duplicated or corrupted 
+- The network discards packets it can’t deliver 
+- Easily run over any type of link layer
+
+**TCP and UDP Transport**
+
+- IP network provides best effort service 
+- Packets can be lost, duplicated, delayed, or re-ordered
+
+_Transport isolates applications from the network_
+- Demultiplexes traffic for different applications
+- Enhances network quality of service to offer appropriate reliability 
+- Performs congestion control, adapts to network capacity
+
+_Only two deployable transport protocols in the Internet:_
+- **UDP** : user datagram protocol
+- **TCP** : transmission control protocol
+
+**UDP**
+
+- Simplest transport protocol
+
+_Exposes raw IP service to applications_
+- Connectionless, best effort packet delivery: framed, but unreliable
+- No congestion control
+- Adds 16 bit port number to identify services
+
+_Used by applications preferring timeliness over reliability_
+- Voice-over-IP
+- Streaming video
+- Gaming 
+
+- Must be able to tolerate some loss of data
+- Must be able to adapt to congestion in the application layer
+
+_Refer to 01e for UDP diagram_
+
+**TCP**
+
+_Reliable, ordered, byte stream delivery service running over IP_
+- Lost packets are retransmitted; ordering is preserved; message boundaries are not preserved 
+- Adapts sending rate to match network capacity \-\> congestion control
+- Adds port number to identify services 
+
+Used by applications needing reliability \-\> default choice for most applications
+
+_Refer to 01e for TCP diagram and format layout_
+
+**TCP Congestion Control** : Converge on fair share of path capacity using AIMD algorithm
+
+_AIMD_ : additive-increase/multiplicative-decrease algorithm is a feedback control algorithm best known for its use in TCP congestion control. AIMD combines linear growth of the congestion window with an exponential reduction when congestion is detected
+
+**Higher Layer Protocols**
+
+_The OSI reference model defines three layers above the transport:_
+- Session layer 
+- Presentation layer 
+- Application layer 
+
+- Internet architecture makes no clear distinction between these layers
+
+_Goal \- support application needs:_
+- Manage transport layer connections
+- Name and locate application-level resources 
+- Negotiate data formats, and perform format conversion if needed 
+- Present data in appropriate manner 
+- Implement application-level semantics
+
+**Session Layer: Managing Connections**
+- What connections does the application need?
+- How to find participants?
+- How to setup connections? 
+ 
+
+_How does session membership change?_
+- Does the group size vary greatly?
+- How rapidly do participants join and leave?  
+- Are participants aware of other members?
+
+_Refer to 01f for diagrams of example application connections_
+
+**The Presentation Layer**
+
+_Managing the presentation, representation, and conversion of data:_
+- Media types and content negotiation 
+- Channel encodings 
+- Internationalisation, languages, and character sets
+
+Common services used by many applications. 
+
+**The Application Layer**
+
+_Protocol functions specific to the application logic_
+- Deliver email 
+- Retrieve a web page
+- Stream video 
+
+**Protocol Standards**
+
+- The OSI model is a reasonable way of thinking about network protocols
+
+_But – it misses two key layers:_
+- Financial
+- Political 
+
+- Successful network protocols support interoperability between different vendors \- this interoperability exists because those vendors work to standardise the protocols
+
+**Rough consensus and running code** : standards are the result of much discussion and negotiation
