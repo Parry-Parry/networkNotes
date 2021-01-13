@@ -18,6 +18,7 @@ _Applications goals_
 **Network Protocols** : Formal standards and policies made up of rules, procedures and formats that defines communication between two or more devices over a network
 
 **Protocol Layering: The OSI Reference Model**
+
 Application <\-\-\-\> Application
 Presentation <\-\-\-\> Presentation
 Session <\-\-\-\> Session
