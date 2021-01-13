@@ -46,4 +46,49 @@ _Sinusoidal_ : having the form of a sine curve
 **Encoding Data onto Wired Channels**
 
 - Signal usually directly encoded onto the channel, by varying some property of the channel, and occupies baseband region
-- The maximum bitrate of a channel is described by Nyquist’s theorem: R<sub>max</sub> $\leq$ 2B log<sub>2</sub>V
+- The maximum bitrate of a channel is described by Nyquist’s theorem: R<sub>max</sub> \le 2Blog<sub>2</sub>V
+- _B_: bandwidth of the channel
+- _V_ : number of discrete values per symbol
+- Maximum data rate only reached with a noise\-free channel
+
+**Baseband Data Encoding**
+
+_Non-return to zero (NRZ) encoding_ : 
+- Encode a 1 as a high signal, 0 as low signal 
+- No variation in waveform if long runs of same value sent \- easy to miscount number of bits
+
+_Manchester encoding:_
+- Encode a 1 as high-low transition, a 0 as a low\-high transition 
+- Doubles bandwidth needed, since transition on every bit, but avoids miscount
+
+Signal encoded onto the channel by varying channel characteristics – voltage applied to an electrical cable, intensity of laser in optical fibre
+
+**Encoding Data onto Wireless Channels** 
+
+_Shifts signal from baseband to a higher carrier frequency_
+
+- Carrier wave applied to channel at frequency, C; signal modulated onto the carrier
+- Bandwidth unchanged, but shifted to range centred on the carrier frequency
+- Wireless links use carrier modulation, rather than baseband transmission 
+- Allows multiple signals on a channel, modulated onto carriers of different frequency
+- Performance affected by carrier frequency, transmission power, modulation scheme, type of antenna, etc.
+
+**Amplitude, Frequency, Phase Modulation**
+
+Complex modulations are possible: Gigabit Ethernet uses amplitude modulation with five different amplitudes
+
+Modulation schemes are often combined: for example, dial\-up modems vary phase and amplitude \-\> quadrature amplitude modulation with 12 phase shift values at two different amplitudes
+
+_Modem_ : a hardware device that converts data from a digital format
+
+_Refer to 01c for a diagram showing visual representations of modulation_
+
+**Spread Spectrum Communication**
+- Single frequency channels prone to interference 
+- Mitigate by repeatedly changing carrier frequency, many times per second: noise unlikely to affect all frequencies 
+- Use a pseudo\-random sequence to choose which carrier frequency is used for each time slot 
+- Seed of pseudo-random number generator is shared secret between sender and receiver, ensuring security
+
+_Example: 802.11b Wi-Fi uses spread spectrum using several frequencies centred at either 2.4 GHz or 5 GHz_
+
+**Physical Link Characteristics and Limitations**
