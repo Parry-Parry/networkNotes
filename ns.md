@@ -351,3 +351,110 @@ _But – it misses two key layers:_
 - Successful network protocols support interoperability between different vendors \- this interoperability exists because those vendors work to standardise the protocols
 
 **Rough consensus and running code** : standards are the result of much discussion and negotiation
+
+**The Changing Internet: Architectural Assumptions**
+
+_The original design of the Internet made certain assumptions:_
+- Devices are generally located in a fixed location, and have a small number of network interfaces that are uniquely addressable 
+- The network and services are decentralised 
+- Best effort service provides sufficient quality
+- The network is trusted
+- Innovation can happen at the edges; the network is dumb 
+
+Reasonable for the 1980s, when the IP architecture was defined, but the network has changed \- how have the protocols changed?
+
+**Changes in Addressing and Reachability**
+
+_Assumption: every network interface has unique IP address_
+- Devices uniquely addressable with uniform connectivity
+- In principle, any device can connect to any other; policy enforced by firewalls, privacy protected by changing address assignments 
+
+- IPv4 has insufficient addresses to support this model 
+- IPv6 deployment is slow; NAT is widespread
+
+_Implication: connectivity becomes difficult_
+- Dual-stack IPv4/IPv6 connection racing \(“happy eyeballs”\)
+- NAT traversal for peer-to-peer applications
+- Complicates software design and implementation
+- Forces reliance on cloud services and encourages centralisation
+
+**IPv4 Address Exhaustion**
+
+- IANA assigned last IPv4 block to regional Internet registries \(RIRs\) in 2011 
+- RIRs have exhausted the available IPv4 addresses, or soon will
+
+_IANA_ : The Internet Assigned Numbers Authority is a standards organization that oversees global IP address allocation
+
+_IPv6 Deployment is Slow_
+
+**Establishing Connectivity in the Modern Internet**
+
+_NAT traversal \-\> binding discovery, exchange, probing_
+- STUN, TURN, and the ICE algorithm
+- Requires a server with public IP address forbinding discovery; centralised point of control
+- Complex, slow, unreliable, wastes power, generates unnecessary traffic
+
+_NAT_ : Network address translation is a method of remapping an IP address space into another by modifying network address information in the IP header
+
+_Dual stack \-\> connection racing_
+- Some paths support IPv4, some IPv6; probingand connection timeouts slow for client-serverapplications
+- Race connections by probing in parallel: hardto implement, wastes resources 
+
+NAT and dual stack operation complicates connection establishment; encourages centralisation onto cloud services.
+
+**Increasing Mobility**
+
+- IP addresses intended to encode location in the network 
+
+_**Ubiquitous mobile devices** \- smartphones \- complicate addressing and reachability since devices change their IP address each time they move:_
+- TCP connections must be re-established after each move 
+- UDP packets must be redirected after each move
+- Complex signalling and connection management if devices move frequently
+
+**Hypergiants and Centralisation**
+
+- Internet topology is flattening, becoming increasingly centralised 
+- Transit network ecosystem being replaced by direct connections from “eyeball” networks to content providers – Google, Facebook, Amazon, Akamai, ...  
+- Implications for network neutrality, competition, innovation
+
+_Refer to 01g for a diagram further explaining this concept_
+
+**Supporting Real-time Traffic**
+
+_Video streaming dominates Internet traffic, growing \>40% per year_
+- Packet loss \-\> quality impairments or increased delay
+- Driving centralisation and direct CDN connections \-\> easier to manage quality
+- Driving TCP congestion control and TCP replacements \-\> BBR algorithm, QUIC; low-latency 
+
+_Interactive real-time media has stricter constraints_
+- WebRTC, Zoom, VoIP, gaming, ... \-\> non-TCP transport to lower latency
+
+**Supporting Real-time Traffic: Impact of COVID-19**
+- Residential networks saw \>20% increase in traffic overnight at the start of the COVID-19 lockdown
+- Mobile networks saw \~10% drop in traffic
+
+- Video conferencing providers saw massive growth in traffic
+- The Internet was flexible enough to support this shift – can we maintain such flexibility while also improving quality?
+
+_Refer to 01g for web traffic stats during COVID\-19 pandemic_
+
+**Innovation in the Network**
+
+_Can we still change the network protocols?_
+- NATs, firewalls, middleboxes \-\> TCP is hard to change now
+- Transport encryption, tunnel over UDP \-\> QUIC? Pervasive encryption to defeat pervasive monitoring and surveillance? 
+- Protocol ossification is a real concern
+- Is the model smart edges and a dumb network appropriate? 
+
+_Can new startups compete with the hypergiants?_
+- Several forces pushing towards centralisation \- can we evolve the network to counter these? 
+- Can we enable a decentralised network?
+
+**Can the network evolve to address these challenges?**
+- How to establish connections in a fragmented network? 
+- How can encryption protect against pervasive monitoring and prevent transport ossification?
+- How can we reduce latency and support real\-time and interactive content? 
+- How can we adapt to the vagaries of wireless networks? 
+- How can we identify and distribute content? How can we manage the tussle for control of the DNS and naming? 
+- How can we manage interdomain routing to efficiently delivery content?
+- How can we re-decentralise the network?
