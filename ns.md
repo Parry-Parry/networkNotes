@@ -20,11 +20,17 @@ _Applications goals_
 **Protocol Layering: The OSI Reference Model**
 
 Application <\-\-\-\> Application
+
 Presentation <\-\-\-\> Presentation
+
 Session <\-\-\-\> Session
+
 Network <\-\-\-\> Network \- Network <\-\-\-\> Network
+
 Data Link <\-\-\-\> Data Link \- Data Link <\-\-\-\> Data Link
+
 Physical 
+
 End System \-\-\- Router \-\-\- End System
 
 - A standard model of layered protocol design – real networks don’t follow this model – they’re more complex, and layer violations, sublayers, and tunnels are commonplace 
