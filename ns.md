@@ -53,7 +53,7 @@ _Sinusoidal_ : having the form of a sine curve
 **Encoding Data onto Wired Channels**
 
 - Signal usually directly encoded onto the channel, by varying some property of the channel, and occupies baseband region
-- The maximum bitrate of a channel is described by Nyquist’s theorem: R<sub>max</sub> $\leq$ 2Blog<sub>2</sub>V
+- The maximum bitrate of a channel is described by Nyquist’s theorem: R<sub>max</sub> &le; 2Blog<sub>2</sub>V
 - _B_: bandwidth of the channel
 - _V_ : number of discrete values per symbol
 - Maximum data rate only reached with a noise\-free channel
