@@ -98,6 +98,8 @@ _Refer to 01c for a diagram showing visual representations of modulation_
 
 _Example: 802.11b Wi-Fi uses spread spectrum using several frequencies centred at either 2.4 GHz or 5 GHz_
 
+_Spread spectrum_ : Changing the carrier frequency several times per second to avoid obstacles at a particular range
+
 **Physical Link Characteristics and Limitations**
 
 - Real-world network links are imperfect, and subject to noise
@@ -465,3 +467,47 @@ _Can new startups compete with the hypergiants?_
 - How can we identify and distribute content? How can we manage the tussle for control of the DNS and naming? 
 - How can we manage interdomain routing to efficiently delivery content?
 - How can we re-decentralise the network?
+
+### Videos
+
+**Optical Fibre** : modulation by intensity of light
+
+**Electrical Wire** : modulation by voltage
+
+Modulation directly corresponds to the signal to be sent
+
+**Bandwidth** : The range of frequencies occupied by a signal
+
+_Twisted pair maximum bandwidth depends on the length of the wire, the tightness of twists and the thickness of the wires_
+
+IN NRZ, in long runs of the same value it can be difficult to determine exactly how long that value has been sent leading to miscounting
+
+Amplitude modulation is more susceptible to noise than frequency modulation
+
+Real systems use multiple types of modulation
+
+**Preamble** : pattern that can only occur at the start of a message
+
+**Header** : Gives information such as addresses and the length of a message
+
+_Start code assists in synchronisation and timing recovery_
+
+Collisions are more likely to occure in large networks with propagation delays but can happen in any network
+
+_CSMA/CD can double the wait time each time a collision occurs and resets the wait time when a successful transmission occurs_
+
+The network layer provides flexibility but is not optimised for performance
+
+_Uniform network_ : anyone can send anyone else signals subject to firewall policies
+
+IPv4 allows for fragmentation of large packets over smaller bandwidth networks.
+
+**DSCP** : allows for a packet to be considered higher priority in a network
+
+IPv6 requires a host to adjust packet size themselves to adapt to a network as it does not allow for fragmentation.
+
+_An IP address identifies the location where a device accesses a network not the device itself._
+
+**BGP** : Border Gateway Protocal, allows for each AS to advertise the network prefixes it owns to tell the rest of the network where to send packets destined for IP addresses within those prefixes
+
+_Channel encodings_ : adapting data to fit the limitations of the channel
