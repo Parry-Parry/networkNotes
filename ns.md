@@ -511,3 +511,278 @@ _An IP address identifies the location where a device accesses a network not the
 **BGP** : Border Gateway Protocal, allows for each AS to advertise the network prefixes it owns to tell the rest of the network where to send packets destined for IP addresses within those prefixes
 
 _Channel encodings_ : adapting data to fit the limitations of the channel
+
+## Week 2
+### Slides
+
+#### TCP Connections
+
+- Typical TCP\-based applications are client\-server 
+- Server listens for connections on a well\-known port 
+- Clients connects to the server 
+- Client sends requests; server responds 
+
+- Can be used in a peer\-to\-peer manner 
+- The two peers simultaneously connect\(\) to each other, then send and receiver data 
+- Uncommon, but possible – requires both peers to have known and accessible IP addresses, and to bind\(\) to known ports
+
+#### TCP Client\-Server Connection Establishment 
+
+- The server calls accept\(\) and waits 
+
+_The connect() call triggers the three-way handshake:_
+
+**Client → Server:**
+- SYN \(“synchronise”\) bit set in TCP header 
+- Client’s initial sequence number chosen at random 
+
+**Server → Client:**
+- SYN 
+- ACK for client’s initial sequence number 
+- Server’s initial sequence number chosen at random 
+
+**Client → Server:**
+- ACK for server’s initial sequence number 
+
+- When handshake completes, connection is established
+
+- Calls send\(\)/recv\(\) transmit data 
+- For short flows, initial three\-way handshake can take a significant fraction of connection lifetime
+
+#### Impact of Latency on Performance 
+
+_Assume a very simple web page:_
+- 1x HTML file, 1x CSS file, and 1x image 
+- HTML and CSS files hosted on one server, image on a different server 
+- Everything retrieved via HTTP over TCP/IP 
+
+_How long does it take to retrieve that page?_
+- 1x RTT handshake to connect to server 1 
+- 1x RTT + serialisation time to fetch HTML file 
+
+\+ Longest of:
+- 1x RTT \+ serialisation time to fetch CSS file 
+
+and:
+
+- 1x RTT handshake to connect to server 2 
+- 1x RTT + serialisation time to fetch image
+
+- Performance depends on RTT and available bandwidth 
+
+_What is a typical RTT?:_
+- Depends on distance 
+- Depends on network congestion 
+
+_What is typical available bandwidth?:_
+- ADSL2\+ → 25Mbps 
+- VDSL → 50Mbps 
+- 4G wireless → 15-30Mbps 
+
+**all assuming otherwise idle network**
+
+_Latency hurts performance_
+- Connection establishment is slower 
+- Retrieving data takes longer
+
+_As RTT increases, benefits of increasing   bandwidth reduce:_
+- For this example, with 300ms RTT, increasing   bandwidth from 15Mbps to 1Gbps gives only  22% reduction in page download time 
+- Connection setup time – the 3\-way handshake   of TCP – dominates in many scenarios 
+
+**Refer to slides 02A for examples in different transfer protocols for fetching data**
+
+#### Impact of Transport Layer Security 
+
+_The protocol running over TCP can also impact performance:_
+- HTTP sends and retrieves data immediately the TCP connection is open 
+- HTTPS opens a TCP connection, negotiates security parameters using TLS within that TCP connection, then starts to send and receive encrypted data – what impact does this have?
+
+_Revisit simple web page download example:_
+- 1x HTML file, 1x CSS file, and 1x image 
+- HTML and CSS files hosted on one server, image on a different server 
+- Everything retrieved via HTTPS over TCP/IP 
+
+_TLS v1.3 introduces two RTTs extra latency:_
+- One extra RTT per connection to negotiate security parameters 
+- Further causes impact of RTT and connection establishment to dominate performance
+
+#### Impact of Latency on TCP Performance 
+
+_For client\-server applications, each request takes 1x RTT plus data serialisation time:_
+- Unless data is very large, RTT is often most significant performance factor 
+- Each TCP connection has 1x RTT connection setup overhead 
+- If TLS v1.3 is used inside TCP, an additional 1x RTT 
+- If TLS v1.2 is used inside TCP, an additional 2x RTT 
+
+_To improve performance in your application:_
+- Reduce the number of TCP connections used 
+- Limit the number of request-response exchanges between client and server
+
+#### Impact of IPv6 and Dual Stack Deployments
+
+_IPv4 → IPv6 transition means we have two Internets:_
+- Some hosts only connect via IPv4, some only via IPv6, some have both types of address 
+- Some links carry only IPv4 traffic, some only IPv6 traffic, some both types of traffic 
+- Some firewalls block IPv4, some block IPv6, some block both types of traffic 
+
+- IPv6 network is not a subset of the IPv4 network; it’s separate, but overlaps in places
+
+#### Happy Eyeballs 
+
+_How to connect to a host with more than one IP address?_
+- Perform DNS lookups for IPv4 and IPv6 in parallel; start with whichever completes first 
+- Call connect\(\) for that address; if not connected within \~100ms, start connect\(\) to next address on the list in parallel, alternating between IPv4 and IPv6
+- Use first connect\(\) that succeeds, drop other successful connections 
+- Balances speed to connect vs network overload by trying all at once in parallel
+
+#### Peer\-to\-peer Connection Establishment 
+
+- The Internet is conceptually a peer\-to\-peer network – any device can, in principle, talk to any other 
+- You should be able to run a TCP server on any device 
+- You should be able to run a TCP\- or UDP\-based peer\-to\-peer application 
+- In practise peer-to-peer connection establishment is difficult, due to network address translation \(NAT\)
+
+#### Network Address Translation \(NAT\) 
+
+- IPv4 address space is exhausted 
+- IPv6 is the long\-term solution, but the transition is taking many years
+-  Network address translation \(NAT\) is a workaround for the shortage of IPv4 addresses; it allowing several devices to share a single IP address
+
+#### Connecting a Single Host
+
+- An Internet service provider (ISP) owns an IP address prefix
+- They assign a customer a single address for a single host
+
+- An Internet service provider owns an IP address prefix
+- They assign a customer a single address for a single host 
+- No address translation
+
+#### Connecting Multiple Hosts
+
+- The customer buys another host 
+- How does it connect?
+
+_What’s supposed to occur:_
+- Customer acquires a router, which gets the customer’s previous IP address 
+- ISP assigns new range of IP addresses to customer \(from the ISP’s prefix\) 
+- Customer gives each host an address from that new range
+- No address translation
+
+#### Network Address Translation 
+
+_What actually happens:_
+- Customer acquires a NAT router, which gets the customer’s previous IP address 
+- Customer gives each host on their network a private address
+
+_NAT performs address translation on packets traversing it:_
+- Change source IP address in packet header to match external address of NAT 
+- Change source TCP/UDP port in packet header to some unused value 
+- Records the mapping, so the reverse changes can be made to any incoming replies as they traverse the NAT in the reverse direction
+
+#### NAT and Private Address Ranges 
+
+- The NAT hides a private network behind a single public IP address 
+- The private IP network address ranges are 10.0.0.0/8, 176.16.0.0/12, and 192.168.0.0/16 
+
+- Gives the illusion of more address space, by reusing IP addresses in different parts of the network 
+
+#### NAT Routers Encourage Centralisation
+
+- Client\-server applications with client behind NAT work without changes – web and email 
+- Client-server applications with server behind NAT fail – need explicit port forwarding 
+- Peer\-to\-peer applications fail – complex NAT traversal algorithm needed to connect 
+- Encourages centralisation of services
+
+#### NAT Breaks Applications – Why Use It? 
+
+_To work around lack of IPv4 address space:_
+- Many ISPs have insufficient IPv4 addresses to give their customers a large enough prefix – each customer given one IPv4 address and a NAT 
+- Many customers don’t want to pay their ISP for more IPv4 addresses – addresses are scarce, so expensive 
+- IPv6 is designed to make addresses cheap and plentiful, to avoid these problems
+
+_To translate between IPv4 and IPv6 addresses:_
+- ISP network runs IPv6 only; customers given public IPv6 addresses 
+- Translate IPv4\-to\-IPv6 as packets leave private network 
+- If destined for IPv4 host on the Internet, translate back to IPv4 on leaving ISP network 
+- If destined for IPv6 host on the Internet, forward directly 
+- May be useful if ISP has more customers than it has IPv4 addresses
+
+_To avoid re-numbering a network when changing to a new ISP:_
+- Hard\-coding IP addresses, rather than DNS names, in configuration files and application is a bad idea 
+- Many people do it anyway – makes changing IP addresses difficult 
+- IPv6 tries to make renumbering networks easier, by providing better auto\-configuration 
+- Some vendors also offer IPv6\-to\-IPv6 NAT
+
+#### Implications of NAT for TCP Connections
+
+_Outgoing connections create state in NAT, so replies can be translated to reach the correct host on the private network_
+- Need to send data periodically, else NAT will assume the connection has failed 
+- Recommended time out interval is 2 hours, many NATs use shorter
+
+_No state for incoming connections_
+- NAT can’t know where to forward incoming connections, without manual configuration 
+- Complicates running a server behind the NAT, or peer\-to\-peer applications
+
+#### Implications of NAT for UDP Flows
+
+_Outgoing UDP packets create state in NAT, so replies can be translated to reach the correct host on the private network_
+- UDP not connection-oriented; NAT can’t detect the end of a flow, so use short timeout to cleanup state once UDP flow has stopped 
+- UDP NAT traversal standards suggest sending a keep-alive every 15 seconds 
+
+_No state for incoming connections_
+- UDP NATs often more permissive about allowing incoming packets than TCP NATs; many allow replies from anywhere to an open port – simpler for peer\-to\-peer traffic
+
+#### Peer\-to\-peer NAT Traversal Concepts 
+
+- NATs support outbound connections from client to server 
+- Incoming connections fail, since NAT cannot know how to translate the incoming packets 
+- Peer\-to\-peer connections can succeed if both NATs think a client server connection is being opened, and the response is coming from the server
+
+_Peers connect to referral server on public network_
+- **binding discovery** : Use server to discover the NAT bindings
+- **Exchange candidate** : addresses with peer via the referral server 
+
+_Peers systematically probe connectivity, try to establish a connection using every possible combination of addresses_
+- Every possible network interface and protocol, mapped and local 
+- Complex and generates significant traffic overhead
+
+#### Binding Discovery 
+
+- Packets sent from a host on a private network to a server on the public network will have source IP address and port translated 
+- The server can see the translated address/port, and send a reply back to the host telling it the address its packets appear to come from – the server reflexive address 
+- Known as NAT binding discovery 
+- The STUN Protocol \(session traversal utilities for NAT\) is a standard binding discovery mechanism 
+
+_Host attempts to find every possible candidate IP address, on which it might be reachable_
+- The IPv4 and IPv6 addresses of each of its interfaces \(Wi\-Fi, Ethernet, 4G, …\) 
+- For each address, any server reflexive addresses discovered using STUN from that address 
+- Any relayed addresses \(e.g., via a TURN or SOCKS proxy, VPN server, etc.\)
+
+#### Candidate Exchange
+
+- Each host discovers its candidate IP addresses/ports 
+
+_The peer hosts exchange candidates, using server on the public network that is reachable by both as a relay_
+- They make TCP connections to the relay server and exchange data over those connections 
+- Why not just send all the data via the relay server? To reduce latency, and to preserve privacy 
+- The relay is always aware that communication is being attempted; this communication metadata is potentially sensitive information
+
+#### Probe for connectivity: The ICE Algorithm
+
+_The hosts systematically try connect\(\) from each of their candidate addresses, to every candidate address of their peer_
+- Connection requests sent from a host that passes through a NAT will open a binding that allows a response, even if the connection request fails 
+- A later incoming connection request that reaches the port on the NAT previous opened by previous outgoing request will pass the NAT, allowing the connection to succeed 
+- The hosts then exchange data over the path to confirm success 
+
+_The ICE algorithm, RFC 8445, describes how to do this_
+
+#### Peer\-to\-peer NAT Traversal 
+
+- Binding discovery and systematic connection probing is complex, slow, and generates a lot of unnecessary traffic 
+
+_Effective for UDP traffic_
+- Developed to support VoIP applications, that send UDP packets 
+- Connectionless nature of UDP means NATs tend to be permissive about allowing incoming packets, provided they reach the correct port 
+
+_Less effective for TCP connections_
+- NATs often require an exact match for incoming packets to a previous outgoing TCP packet – addresses, ports, TCP sequence numbers – before they allow a connection to be established
