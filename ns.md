@@ -1035,18 +1035,18 @@ _Less effective for TCP connections_
 
 * For communication to be secure, it must be end\-to\-end
 * The two endpoints are the sender and the final recipient
- * With a data centre or CDN, what is the final recipient?
-  * Is it the load balancer at the entrance to the data centre, or the server within the data centre that processes the request? 
-  * If the request is directed to a content distribution network \(CDN\), is the end the local cache that serves the request? If so, how are the encryption keys shared? 
+    * With a data centre or CDN, what is the final recipient?
+     * Is it the load balancer at the entrance to the data centre, or the server within the data centre that processes the request? 
+     * If the request is directed to a content distribution network \(CDN\), is the end the local cache that serves the request? If so, how are the encryption keys shared? 
  * If the data is moving between two users, is it encrypted between the two users or between each user and the data centre?
-  * i.e., can the data centre see user-to-user data flows?
-  * This is normal if you run TLS from user\-to\-data centre then from data centre\-to\-user
+     * i.e., can the data centre see user-to-user data flows?
+     * This is normal if you run TLS from user\-to\-data centre then from data centre\-to\-user
 * Is there in\-network processing? How much data is revealed to the in\-network server?
- * e.g., video conference with privacy protection vs. without 
- * Does the central server decrypt the speech data, mix into one stream and send to the receiver, or does it forward all active streams in encrypted form
- * Trades\-off security vs bandwidth 
-  * For audio the bandwidth is small enough this doesn’t matter
-  * For video conferencing, the combined bandwidth may be significant
+    * e.g., video conference with privacy protection vs. without 
+    * Does the central server decrypt the speech data, mix into one stream and send to the receiver, or does it forward all active streams in encrypted form
+    * Trades\-off security vs bandwidth 
+    * For audio the bandwidth is small enough this doesn’t matter
+    * For video conferencing, the combined bandwidth may be significant
 
 #### The Robustness Principle (Postel’s Law)
 
@@ -1068,8 +1068,8 @@ _Balance interoperability with security – don’t be too liberal in what you a
 #### Writing Secure Code
 
 * The network is hostile: any networked application is security critical 
- * Must carefully specify behaviour with both correct and incorrect inputs
- * Must carefully validate inputs and handle errors
- * Must take additional care if using type\- and memory\-unsafe languages, such as C and C\+\+, since these have additional failure modes
+    * Must carefully specify behaviour with both correct and incorrect inputs
+    * Must carefully validate inputs and handle errors
+    * Must take additional care if using type\- and memory\-unsafe languages, such as C and C\+\+, since these have additional failure modes
 * **The best encryption doesn’t help if the endpoints can be compromised**
 
