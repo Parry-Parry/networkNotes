@@ -786,3 +786,290 @@ _Effective for UDP traffic_
 
 _Less effective for TCP connections_
 - NATs often require an exact match for incoming packets to a previous outgoing TCP packet – addresses, ports, TCP sequence numbers – before they allow a connection to be established
+
+## Week 3
+### Slides
+
+#### Numerous Organisations Monitor Internet traffic
+
+* Governments, intelligence agencies, and law enforcement 
+ * Good reasons to monitor some traffic
+ * Edward Snowden showed pervasive monitoring of all traffic
+* Business “Your call may be monitored for quality and training purposes” 
+ * Regulatory requirements to record some traffic – e.g., banking 
+ * To profile customers for advertising
+* Network operators
+ * To support network operations and trouble\-shooting
+ * To profile customers for advertising
+* Criminals and malicious users 
+ * Steal data and user credentials; identity theft; active attacks
+
+#### Protecting Privacy
+
+* Mechanisms that protect privacy against malicious attackers will also prevent benign monitoring
+* No known way to stop criminals and malicious attackers from accessing private data that doesn’t also stop law enforcement
+
+#### Protecting Message Integrity
+
+* Numerous organisations may want to change messages in transit
+ * Governments, intelligence agencies, and law enforcement 
+  * Many governments require ISPs to censor or modify DNS responses
+  * Many governments require ISPs to censor messages containing certain content
+ * Businesses and network operators
+  * To enforce legal restrictions on content, terms of service, or to prevent copyright infringement
+ * Criminals and malicious users
+  * Phishing scams and identity theft
+* Mechanisms to protect messages from malicious attackers also prevent benign actors
+ * e.g., web browsers deploy DNS-over-HTTPS \(DoH\) to ensure integrity of DNS responses → protects against phishing attacks that modify DNS replies → stops ISPs modifying DNS responses to prevent access to domains hosting illegal material
+* No technical way to distinguish beneficial integrity violations from malicious attacks
+
+#### Preventing Protocol Ossification
+
+* Network operators deploy middleboxes to monitor/modify traffic: 
+ * NATs, firewalls, monitors, traffic shaping, filtering, etc.
+ * Some are necessary and beneficial, others perhaps less so
+* Middleboxes must understand protocols used by the network traffic:
+ * e.g., NAT has to know where to find IP addresses and ports in packets, if it is to translate them
+ * e.g., traffic shapers, that limit TCP throughput for users exceeding their monthly bandwidth use cap, need to parse TCP packets and know how to change them to influence congestion control 
+* This can lead to protocol ossification – cannot change end-to-endprotocols, because doing so interacts poorly with middleboxes that don’t understand the changes
+* The more of a protocol that is encrypted, the easier it is to change – since middleboxes cannot understand or modify the data – but the harder it is for middleboxes to provide useful services
+
+#### Security and Policy
+
+* Strong reasons to protect privacy, prevent modification in data in transit, and prevent protocol ossification
+* The consequences of this protection are sometimes problematic
+* Dialogue between engineers, protocol designers, operators, policy makers, and law enforcement crucial – to understand constraints and concerns
+
+#### Goals of Secure Communication
+
+* Goal: deliver message from sender to receiver 
+ * Avoid eavesdropping → encrypt to provide confidentiality 
+ * Avoid tampering → authenticate to ensure the message is not modified in transit
+ * Avoid spoofing → validate identity of sender
+
+#### How to Provide Confidentiality? 
+
+* Data traversing the network can be read by any device on the path
+ * Can eavesdrop on packets as they traverse a link
+ * Configure a switch or router to snoop on data as it’s forwarded between links
+* The network operator can always do this; if their network has been compromised, maybe so can others
+* Data can always be read → use encryption to make it useless if intercepted
+* Two basic approaches
+ * Symmetric cryptography
+  * Advanced Encryption Standard \(AES\)
+ * Public key cryptography
+  * The Diffie\-Hellman algorithm 
+  * The Rivest-Shamir\-Adleman \(RSA\) algorithm
+  * Elliptic curve\-based algorithms 
+
+#### Symmetric Cryptography
+
+**Symmetric encryption converts plain text into cipher\-text**  
+* A secret key control the encryption and decryption process 
+ * Same key used to encrypt as is used to decrypt
+ * Provided the key is secret and only known to sender and receiver, the conversation is secure – problem: how to securely distribute the key?
+* Very fast – suitable for bulk encryption
+* Encryption and decryption algorithms are public
+
+#### Public Key Cryptography
+
+**Public key encryption also converts plain text into cipher\-text**  
+* Again, the algorithms are public:
+ * Diffie–Hellman 
+ * Rivest–Shamir–Adleman \(RSA\)
+ * Ephemeral Elliptic Curve Diffie\-Hellman
+* Public key algorithms use two related keys: 
+ * The public key for a user is widely distributed
+ * The corresponding private key must be kept secret
+ * If one key is used to encrypt, the other key is needed to decrypt the message 
+* Solves key distribution problem 
+ * Look\-up the public key of the receiver in a directory 
+ * Sender uses the public key to encrypt the message → can only be decrypted by the private key 
+ * If receiver is trusted to keep private key secret, only it can decrypt the message
+* Problem: very slow to encrypt and decrypt
+
+#### Hybrid Cryptography
+
+* Modern communications use a combination of both public\-key and symmetric cryptography for security and speed 
+ * Sender chooses a random value, K<sub>s</sub>, that can be used as key for the symmetric encryption algorithm 
+ * Sender looks up the receiver’s public key, K<sub>pub</sub>, uses it to encrypt K<sub>s</sub>, and sends the result to the receiver; receiver uses the corresponding private key, K<sub>priv</sub>, to decrypt the message and retrieve K<sub>s</sub>
+  * Securely transfers K<sub>s</sub> from sender to receiver 
+  * Public key encryption is very slow, but the key K<sub>s</sub> is small, so this doesn’t matter
+ * Sender encrypts future messages using symmetric cryptography with key K<sub>s</sub>, receiver also has k<sub>s</sub>, which it uses to decrypt the messages
+  * Symmetric cryptography is fast, but requires the key to be exchanged securely
+  * The public key algorithm has been used to securely exchange the key 
+* Ensures confidentiality of communication with good performance
+
+#### Authentication
+
+**Encryption can ensure confidentiality – but also need to verify identify of sender and ensure messages have not been modified in transit**  
+* Generate a digital signature to authenticate the message 
+* Relies on public key cryptographic and a cryptographic hash
+
+#### Cryptographic Hash Function
+
+* Cryptographic hash takes arbitrary input and produces a fixed length output hash
+ * Any change to input generates different output 
+ * Infeasible to find two inputs that give the same output 
+ * Calculating a cryptographic hash is fast
+ * Reversing a hash, to find the input given only the output, is infeasible
+* Many cryptographic hash algorithms exist: 
+ * Recommendation: SHA256 algorithm
+ * Older algorithms, e.g., MD5 and SHA1, have known security flaws
+
+#### Digital Signatures
+
+* Sender generates a digital signature
+ * Sender calculates the cryptographic hash of the message 
+ * Sender encrypts the hash with their own private key
+  * Anyone can use the sender’s public key to decrypt this, but only the sender can have encrypted it \(if trusted to keep their private key secret\) 
+ * Attaches encrypted hash to the message
+* Message and its digital signature are encrypted and sent to receiver using hybrid encryption
+* Signature verification process:
+ * Receiver decrypts the message 
+ * Receiver calculate cryptographic hash of the message 
+ * Receiver decrypts digital signature using sender’s public key, to find the hash that the sender calculates 
+ * If hash decrypted hash and the hash calculated by the receiver match, then the message is authentic and unmodified – provided the sender kept its private key secret
+
+#### Trust and Public Key Infrastructure
+
+* How to know what public key corresponds to a particular receiver?
+ * The receiver gave you their key in person 
+ * The receiver sent you their key, authenticated by someone you trust
+ * Someone you trust gave you the receiver’s key
+* A public key infrastructure can authenticate keys
+ * PKI verifies sender’s identity, then adds their digital signature to sender’s public key
+ * If receiver trusts PKI, can verify the digital signature to confirm identity of sender
+
+#### Transport Layer Security \(TLS\) v1.3
+
+* TCP is not secure – neither the TCP/IP headers nor the data are encrypted or authenticated 
+* The Transport Layer Security protocol \(TLS v1.3\) can be used to encrypt and authenticate data carried within a TCP connection 
+
+#### TLS v1.3 Overview
+
+* A TCP connection is established 
+* TLS handshake protocol runs within that TCP connection
+ * Authenticates endpoints and agrees on the encryption keys to use
+* TLS record protocol then runs over the TCP connection, lets endpoints exchange authenticated and encrypted blocks of data
+ * TLS turns the TCP byte stream into a series of records → provides framing
+
+#### TLS v1.3 Handshake Protocol
+
+* TCP connection established as usual
+ * SYN→SYN\+ACK→ACK
+* TLS handshake protocol immediately follows 
+ * TLS ClientHello sent with the ACK
+ * TLS ServerHello sent in response 
+ * TLS Finished message concludes, and carries initial secure data record 
+* Adds 1\-RTT to connection establishment
+
+#### TLS v1.3 ClientHello
+
+**The ClientHello message:**  
+* Indicates that TLS v1.3 is to be used
+ * Signals TLS v1.2 in the main ClientHello message, with an extension header to say “I’m really TLS v1.3” because too many middleboxes break if the TLS version changes – protocol ossification
+* Provides the cryptographic algorithms the client supports 
+* Provides the name of the server to which the client is connecting
+ * If connecting to a web hosting server, it’s likely that more than one site is hosted on the same server, so need to specify which is intended
+* Does not contain any data
+
+#### TLS v1.3 ServerHello
+
+**The ServerHello message:**  
+* Indicates that TLS v1.3 is to be used 
+ * It signals TLS v1.2 in the main ServerHello message, and includes an extension header to say “I’m really TLS v1.3” because too many middleboxes break if the TLS version changes – protocol ossification
+* Provides cryptographic algorithms selected by the server, from the set the client suggested 
+* Provides the server’s public key and digital signature used to verify its identity 
+* Does not contain any data
+
+#### TLS v1.3 Finished
+
+**The Finished message:**  
+* Provides the client’s public key
+* Optionally, provides the certificate needed to authenticate the client to the server 
+* May contain data sent from client to server
+
+#### TLS v1.3 Cryptographic Algorithms
+
+* Client and server use the Ephemeral Elliptic Curve Diffie\-Hellman \(ECDHE\) key exchange algorithm 
+ * Client sends its public key to server in ClientHello
+ * Server sends its public key to client in ServerHello
+ * Client and server both combine the two public keys to derive the key used for the symmetric cryptography – complex mathematics; will not describe
+ * Server provides a certificate \(digital signature\) to allow the client to verify its identify in the ServerHello – client can optionally provide this in Finished
+* Client proposes symmetric encryption algorithms in ClientHello, server picks from them and replies in ServerHello
+ * Either AES or ChaCha20 symmetric encryption
+
+#### TLS v1.3 Record Protocol
+
+* TLS v1.3 splits the data into records, each containing ≤ 2<sup>14</sup> bytes
+ * Each record is both encrypted and authenticated; it has a sequence number
+ * Can renegotiate encryption keys between records 
+ * TCP does not preserve record boundaries; TLS adds framing so that it does – reading from a TLS connection will block until a complete record is received
+* Client and server exchange records – send and receive data – then close connection
+
+#### TLS v1.3 0\-RTT Mode
+
+* TLS v1.3 usually takes 1\-RTT to establish a connection, after TCP connection setup 
+* If a client and server have previously communicated, they can re\-use a key: 
+ * Server can send additional encryption keys as part of ServerHello, that client can use the next time is connect to that server
+ * On next connection, ClientHello message can include data to be delivered to the server, encrypted with that pre-shared key; the ServerHello can contain a reply 
+ * This 0\-RTT data may be delivered more than once, if the ClientHello or ServerHellomessages are duplicated – TLS doesn’t stop this
+  * Protection against duplicate messages is provided by sequence numbers in the record layer 
+  * Handshake messages do not have sequence numbers, so duplicated messages can deliver data more than once 
+  * **Be careful writing applications that use 0\-RTT mode**
+
+#### Limitations of TLS
+
+**TLS issecure, but has limitations:**  
+* Does not encrypt server name:
+ * Exposes hostname of server to which connection is being made 
+ * Encrypted SNI extension in development – difficult to deploy
+* Operates within a TCP/IP connection:
+ * IP addresses and TCP port numbers are not protected – exposes information about who is communicating and what application is being used
+* Relies on a PKI to validate public keys:
+ * Significant concerns about trustworthiness of PKI
+* May deliver 0\-RTT data more than once
+
+#### End\-to\-end Security?
+
+* For communication to be secure, it must be end\-to\-end
+* The two endpoints are the sender and the final recipient
+ * With a data centre or CDN, what is the final recipient?
+  * Is it the load balancer at the entrance to the data centre, or the server within the data centre that processes the request? 
+  * If the request is directed to a content distribution network \(CDN\), is the end the local cache that serves the request? If so, how are the encryption keys shared? 
+ * If the data is moving between two users, is it encrypted between the two users or between each user and the data centre?
+  * i.e., can the data centre see user-to-user data flows?
+  * This is normal if you run TLS from user\-to\-data centre then from data centre\-to\-user
+* Is there in\-network processing? How much data is revealed to the in\-network server?
+ * e.g., video conference with privacy protection vs. without 
+ * Does the central server decrypt the speech data, mix into one stream and send to the receiver, or does it forward all active streams in encrypted form
+ * Trades\-off security vs bandwidth 
+  * For audio the bandwidth is small enough this doesn’t matter
+  * For video conferencing, the combined bandwidth may be significant
+
+#### The Robustness Principle (Postel’s Law)
+
+At every layer of the protocols, there is a general rule whose application can lead to enormous benefits in robustness and interoperability:
+
+“Be liberal in what you accept, and conservative in what you send"
+
+Software should be written to deal with every conceivableerror, no matter how unlikely; sooner or later a packet willcome in with that particular combination of errors andattributes, and unless the software is prepared, chaos canensue.  In general, it is best to assume that the network is filled with malevolent entities that will send in packets designed to have the worst possible effect.  This assumptionwill lead to suitable protective design, although the most serious problems in the Internet have been caused by un\-envisaged mechanisms triggered by low\-probability events;mere human malice would never have taken so devious a course!
+
+_Balance interoperability with security – don’t be too liberal in what you accept; a clear specification of how and when you will fail might be more appropriate_
+
+#### Validating Input Data
+
+* Networked applications work with data supplied by un\-trusted third parties 
+* Data read from the network may not conform to the protocol specification 
+* Due to ignorance, bugs, malice, or a desire to disrupt services 
+* **Must carefully validate all data before use**
+
+#### Writing Secure Code
+
+* The network is hostile: any networked application is security critical 
+ * Must carefully specify behaviour with both correct and incorrect inputs
+ * Must carefully validate inputs and handle errors
+ * Must take additional care if using type\- and memory\-unsafe languages, such as C and C\+\+, since these have additional failure modes
+* **The best encryption doesn’t help if the endpoints can be compromised**
+
