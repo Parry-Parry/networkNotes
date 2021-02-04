@@ -1073,3 +1073,317 @@ _Balance interoperability with security – don’t be too liberal in what you a
     * Must take additional care if using type\- and memory\-unsafe languages, such as C and C\+\+, since these have additional failure modes
 * **The best encryption doesn’t help if the endpoints can be compromised**
 
+## Week 4
+### Slides
+#### Limitations of TLS v1.3
+
+**TLS v1.3 is a tremendous success**  
+* Significant security improvements compared to TLS v1.2
+	* Removed support for older and less secure encryption and key exchange algorithms
+	* Removed support for secure algorithms that have proven difficult to implement correctly
+* Some performance improvements to the initial handshake and with 0\-RTT mode  
+**Despite this, TLS v1.3 has some limitations that are hard to fix**  
+* Connection establishment is still relatively slow 
+* Connection establishment leaks potentially sensitive metadata
+* The protocol is ossified due to middlebox interference
+
+#### TLS v1.3 Connection Establishment Performance
+
+* TCP connection established as usual: 
+	* SYN → SYN\+ACK → ACK
+* TLS handshake protocol runs inside TCP connection:
+	* TLS ClientHello sent with final ACK
+	* TLS ServerHello sent in response
+	* TLS Finished message concludes, and carries initial secure data record 
+* First data sent 2x RTT after connection establishment starts 
+* Earliest response received 3x RTT after connection establishment starts
+
+* Average web page comprises 1.7 MB of data, fetched as 69 HTTP requests, using 15 TCP connections
+* 83% of HTTP requests run over TLS 
+* **Enormous amount of time wasted, waiting for TCP and TLS connection establishment handshakes**
+* Can we speed up TLS connection setup?
+	* 0\-RTT Connection Reestablishment – speed\-up connections to known servers 
+	* Concurrent TCP and TLS handshake – speed\-up connections to all servers
+
+#### 0\-RTT Connection Reestablishment 
+
+* Common to connect to a previously known TLS server – is it possible to shortcut the connection establishment in such cases?
+
+**What is the role of the TLS handshake?**  
+* Uses public key cryptographic techniques to establish an ephemeral session key, used to encrypt the data 
+	* The ClientHello and ServerHello are used to exchange material used to derive a session key – using ECDHE key negotiation 
+	* The session is ephemeral – different for each connection; derived from the public keys and a random value
+	* The ephemeral session key provides forward secrecy – each connection has a unique key; if the encryption key for one session leaks, it doesn’t help an attacker break other sessions 
+* Retrieve the server’s certificate, allowing the client to authenticate the server 
+	* The ServerHello contains the certificate
+
+**How to encrypt initial data?**  
+* Cannot negotiate ephemeral session key for initial data → relies on data exchanged in the handshake 
+	* Reuse a pre\-shared key agreed in previous TLS session 
+* In a previous TLS connection
+	* Server sends a PreSharedKey with a SessionTicket to identify the key
+* When reestablishing a connection: 
+	* Client sends SessionTicket, data encrypted using corresponding PreSharedKey, along with ClientHello
+	* The server uses SessionTicket to find saved PreSharedKey, decrypt the data 
+	* ClientHello and ServerHello complete usual key exchange; data sent with ServerHello and later protected using ephemeral session key → no additional round\-trips due to TLS
+
+**What are the potential risks?**  
+* 0\-RTT data sent with ClientHello using a PreSharedKey is not forward secret 
+	* Use of PreSharedKey links TLS connections – if session where PreSharedKey is distributed is compromised, 0\-RTT data sent using that key in future connections will also be compromised
+* 0\-RTT data sent with ClientHello using a PreSharedKey is subject to replay attack
+	* The 0\-RTT data is accepted during TLS connection establishment 
+	* If on\-path attacker captures and replays the TCP segment with the ClientHello, SessionTicket, and data protected with the PreSharedKey, that data will be accepted by the server again
+	* The server will respond to the replay, trying to complete the handshake – this might fail
+	* But – by then, the data will have been accepted 
+	* Ensure 0-RTT data is idempotent to avoid this risk   
+**Be very careful using 0-RTT data in TLS v1.3 – trades performance for safety**
+
+#### TLS v1.3 Metadata Leakage
+
+* IP exposes addresses
+* TCP exposes port numbers and connection metadata
+* When TLS is used with HTTPS, ClientHello includes the Server Name Indication \(SNI\) extension
+	* Identifies requested site, so server knows what public key to use in ServerHello
+	* Required to support shared hosting, with multiple websites on one server 
+	* Has to be unencrypted – sent before session keys are negotiated 
+	* Can’t encrypt with PreSharedKey, since that’s provided by server, and goal is to select the server 
+
+#### TLS v1.3 Protocol Ossification
+
+* TLS is widely implemented, but many poor quality implementations: 
+	* Some TLS servers fail if ClientHello uses unexpected version number, rather than try to negotiate older version 
+	* Some firewalls block connections if ClientHello is structured differently to that used by TLS 1.2 and earlier, even if TLS 1.3 is signalled 
+* Original design of TLS 1.3 changed ClientHello
+	* Updated the version number \(1.2 → 1.3\)
+	* Removed some now unused header fields 
+	* Measurements showed this caused \~8% of TLS 1.3 connections to fail
+
+* Later versions of TLS 1.3 changed the design to work around these bugs
+	* Version number in ClientHello says TLS 1.2; unused header fields present with dummy values; extension header to ClientHello signals actual version
+	* \(Similar changes in ServerHello\) 
+	* When TLS 1.3 client talks to TLS 1.3 server, version negotiated in extensions 
+	* When TLS 1.3 client talks to TLS 1.2 server, extension ignored and TLS 1.2 is negotiated
+* Protocol ossification is a significant concern
+	* TLS is not the only protocol to include such workarounds
+	* Widely deployed faulty implementations constrain design of most protocols
+
+#### How to Avoid Protocol Ossification?
+
+* Ossification happens when extension mechanisms, or allowed flexibility, are not used 
+	* TLS 1.3 was released ten years after TLS 1.2 
+	* Allowed products to be built and deployed that didn’t do version negotiation correctly, since no new versions to negotiate
+	* Allowed products to be built that relied on the presence and order of fields in ClientHello, since all implementations included the same fields in the same order
+* Generate Random Extensions And Sustain Extensibility \(GREASE\) 
+	* If the protocol allows extensions, send extensions
+	* If the protocol allows different versions, negotiate different versions 
+	* Do this even if you don’t need to → “use it or lose it”
+	* Send meaningless dummy extensions that are ignored 
+	* Change the version number to prove you can
+
+#### QUIC: Performance, Security, Avoiding Ossification
+
+* What’s wrong with TLS v1.3 over TCP? 
+	* Slow to connect – due to sequential TCP and TLS handshakes
+	* Leaks some metadata 
+	* Ossified and hard to extend
+* QUIC aims to replace TLS v1.3 and TCP with a single secure transport protocol 
+	* Reduce latency by overlapping TLS and transport handshake 
+	* Avoid metadata leakage via pervasive encryption
+	* Avoid ossification via systematic application of GREASE and encryption
+
+#### QUIC Overview 
+
+* QUIC replaces TCP, TLS, and parts of HTTP 
+	* HTTP → stream multiplexing 
+	* TLS → security
+	* TCP → reliability, ordering, congestion control
+	* Runs on UDP for ease of deployment
+* QUIC is a general purpose client\-server transport 
+	* Designed to run HTTP effectively
+
+#### QUIC Packets, Headers, and Frames
+
+* QUIC sends and receives streams of data within a connection 
+	* Up to 2<sup>62</sup> different streams in each direction in a single QUIC connection
+* A connection comprises QUIC packets sent within UDP datagrams 
+* Each QUIC packet starts with a header, and contains one or more frames 
+	* Frames contain data for streams, or acknowledgements, or other control messages
+
+#### QUIC Headers
+
+* QUIC packets can be long header packets or short header packets
+* Long header packets are used to establish QUIC connections
+	* They all start with a common header, followed by packet\-type specific data
+* Four different long-header packet types, denoted by the TT field in the header: 
+	* Initial – initiates connection, starts TLS handshake 
+	* 0\-RTT – idempotent data sent with initial handshake, when resuming a session 
+	* Handshake – completes connection establishment 
+	* Retry – used to force address validation
+* Several Initial, 0\-RTT, and handshake packets can be included in one UDP datagram, one after the other, followed by a short header packet
+
+* The is one short header packet defined in QUIC:
+	* 1\-RTT – Used for all packets sent after the TLS handshake is complete 
+	* The short header is followed by QUIC frames in the enclosing UDP packet 
+	* Compared to long header, omits information that can be inferred from context
+
+#### QUIC Frames
+
+* QUIC packet contain an encrypted sequence of frames
+	* CRYPTO frames are used to carry TLS messages such as the ClientHello, ServerHello etc.
+	* STREAM and ACK frames send data and acknowledgements 
+	* Migration between two network interfaces is supported by PATH_CHALLENGE and PATH_RESPONSE frames
+	* Other frames control progress of a QUIC connection 
+* Compared to TCP, QUIC headers are limited in scope 
+	* Functionality provided by frames instead → more extensible
+	* e.g., TCP sends sequence numbers and acknowledgements in the header; QUIC sends this information in STREAM and ACK frames
+
+#### QUIC Connection Establishment and Data Transfer
+
+* A QUIC connection proceeds in two phases: handshake and data transfer 
+	* The handshake uses long header packets – establishes the connection, negotiates encryption keys, authenticates the server
+	* The data transfer phase uses short header packets – sends data and acknowledgements after the connection is established
+
+#### QUIC Connection Establishment 
+
+**QUIC combines connection establishment and TLS handshake into one round\-trip**  
+* C → S: QUIC Initial packet 
+	* Initial packet contains a CRYPTO frame that contains TLS ClientHello
+* S → C: QUIC Initial and Handshake packets 
+	* Both QUIC packets can be sent in a single UDP datagram 
+	* Initial packet contains CRYPTO frame that contains TLS ServerHello
+	* Handshake packet contains other connection setup information 
+* C → S: QUIC Initial, Handshake, and 1\-RTT packets 
+	* All three QUIC packets can be sent in a single UDP datagram 
+	* QUIC Initial packet contains ACK frame, acknowledging the server’s Initial packet
+	* QUIC Handshake packet contains CRYPTO frame that contains TLS Finished
+	* QUIC 1\-RTT \(short header\) packet contains STREAM frame with initial data sent from client to server
+
+* QUIC Initial packets play two main roles: 
+	* Synchronise client and server state – like TCP’s SYN and SYN\+ACK packets
+	* Contains CRYPTO frame, with TLS ClientHello or Finished, and may also contain ACK frame 
+	* Combines connection setup and security negotiation in one packet 
+* QUIC Initial packets also carry optional Token
+	* Server can refuse the initial connection attempt, and send a Retry packet containing a Token
+	* Client must then retry the connection, providing the Token in its Initial packet 
+	* Can be used to prevent connection spoofing
+
+* QUIC Handshake packets complete the TLS 1.3 exchange 
+	* The TLS ServerHello and Finished messages
+	* TLS can also renegotiate new keys part\-way through a connection – this is done in Handshake packets
+
+* QUIC supports TLS 0-RTT session re\-establishment:
+	* QUIC Initial packet contains CRYPTO frame with a TLS ClientHelloand a SessionTicket
+	* QUIC 0\-RTT packet included in the same UDP datagram contains a STREAM frame carrying idempotent 0\-RTT data: 
+	* Server responds with data in 1\-RTT \(short header\) packet, along with its Initial and handshake packets
+
+_QUIC combines connection establishment and encryption key negotiation into a single handshake → TLS\-over\-TCP runs them sequentially._
+
+#### Data Transfer, Streams, and Reliability
+
+**After handshake has finished, QUIC switches to sending short header packets**  
+* The short header contains a Packet Number field
+	* Packet numbers increase by one for each packet sent; ACK frames indicate received packet numbers
+	* QUIC packet numbers count packets sent; TCP sequence numbers count bytes of data sent
+	* QUIC never retransmits packets – retransmits frames sent in lost packets in new packets, with new packet numbers 
+	* TCP retransmits lost packet with original sequence number
+* Protected payload section of short header packets contains encrypted QUIC frames
+	* STREAM frames contain data 
+	* ACK frames contain acknowledgements
+* Performs congestion control as in TCP
+
+* QUIC sends acknowledgements of received packets in ACK frames
+	* Sent inside a long\- or short\-header packets; unlike TCP, not part of headers 
+	* Indicate sequence numbers of QUIC packets that were received, not frames
+
+**Data is sent within STREAM frames, sent within QUIC packets**  
+* Contain a stream identifier, offset of the data within the stream, data length, and data 
+* QUIC provides multiple reliable byte streams within a single connection 
+	* Data for each stream is delivered reliably and in\-order 
+	* Order is not preserved between streams
+	* Avoids head\-of\-line blocking between streams
+* Can view QUIC streams as multiple unframed byte streams sent within a single connection; alternatively can view each stream as framing a message, and the connection as a series of messages
+
+#### QUIC over UDP
+
+**Why run QUIC over UDP rather than over IP?**  
+* To ease end\-system deployment in user\-space applications
+* User\-space applications, running over UDP, are easy to build 
+	* BSD sockets; portable → same API works everywhere 
+	* Widely understood programming model 
+	* No need for privileged access
+* No portable, unprivileged, interface to build applications that run directly over IP
+	* Implementations have to run within the operating system kernel
+	* Deploying kernel updates is difficult 
+	* Deploying application updates is straightforward 
+* To work around protocol ossification due to middleboxes
+	* Firewalls block anything other than TCP and UDP
+
+#### Ossification 
+
+* Deployment experience → if a field in a protocol is visible to the network, someone will implement a middlebox that relies on its presence 
+* Once a protocol has been widely deployed, very hard to change
+
+* Protocol ossification affected the design of: 
+	* TLS 1.3 
+	* Multipath TCP
+	* TCP Fast Open 
+	* TCP Selective Acknowledgements
+* Increasingly viewed as a problem in the standards community 
+	* Difficult to evolve network protocols to address new requirements 
+	* A system that can no longer evolve and change will die
+
+#### Avoiding Ossification in QUIC
+
+* Three tools to prevent ossification of QUIC: 
+	* Published protocol invariants 
+	* Pervasive encryption of transport headers
+	* GREASE
+* QUIC is a new design – want to avoid ossification, starting with initial deployments
+* Design the protocol to make it difficult, ideally impossible, for middleboxes to interfere with QUIC connections
+
+#### QUIC Invariants
+
+* Properties of QUIC that will remain unchanged as new versions of the protocol of developed
+	* Explicit guidance to middlebox designers: can assume these properties of QUIC will not change
+	* The IETF will change other fields or properties between QUIC versions
+
+_What invariants are guaranteed?_  
+* Packets start with a long header or a short header 
+	* The first bit of long header packets is always 1; they include version number, destination\- and source\-connection identifiers
+	* The first bit of short header packets is always 0; they include a destination connection identifier 
+* Connections can arbitrarily switch between long header and short header packets
+
+#### Avoiding Ossification via Pervasive Encryption
+
+**QUIC encrypts as much data as possible**  
+* Entire packet except invariant fields and the last 7\-bits of the first byte is encrypted; entire packet is authenticated 
+* Encryption keys for initial handshake packets are derived from connection identifiers
+	* Contain ClientHello and ServerHello, which are unencrypted when using TLS over TCP, and don’t need to be encrypted
+	* QUIC provides no more security than TLS over TCP, but makes it expensive for middleboxes to read handshake
+* Rest of QUIC connection protected by TLS 1.3 as normal 
+* QUIC authenticates all data
+	* If a middlebox changes the headers, the change can be detected
+
+#### Avoiding Ossification via GREASE
+
+**QUIC makes extensive use of GREASE**  
+* Every field encrypted or has a value that is unpredictable
+	* New connections use randomly chosen connection identifies
+	* Clients randomly try to negotiate new version numbers 
+	* Version numbers matching 0x?a?a?a?a for testing version negotiation – will be rejected by servers 
+	* Unused header fields given randomly chosen values
+* Goal is that middleboxes can’t make any assumptions about QUIC header values → nothing in the header is predictable 
+* Hopefully avoids ossification → nothing to ossify around
+
+#### QUIC Benefits and Costs
+
+* Why is QUIC desirable?
+	* Reduces secure connection establishment latency
+	* Reduces risk of ossification; easy to deploy
+	* Supports multiple streams within a single connection 
+* Why is QUIC problematic?
+	* Libraries and support new, poorly documented, and frequently buggy
+	* CPU usage is high compared to TLS\-over\-TCP 
+	* These issues will be resolved – but it will take some years before QUIC is as stable and performant as TLS\-over\-TCP 
+
+_TCP lasted 40 years – QUIC is a similarly long-term project, that’s only just reaching version 1.0._
