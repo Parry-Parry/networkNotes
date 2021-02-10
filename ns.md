@@ -1387,3 +1387,260 @@ _What invariants are guaranteed?_
 	* These issues will be resolved – but it will take some years before QUIC is as stable and performant as TLS\-over\-TCP 
 
 _TCP lasted 40 years – QUIC is a similarly long-term project, that’s only just reaching version 1.0._
+
+## Week 5
+### Slides
+#### Packet Loss in the Internet
+
+**The Internet is a best effort packet delivery network – it is unreliable**  
+* IP packets may be lost, delayed, reordered, or corrupted in transit 
+* How often this happens varies significantly
+	* Wireless links are less reliable than wired links
+	* Countries with well\-developed infrastructure tend to have reliable Internet links; countries with less robust or lower capacity infrastructure tend to see more problems
+	* Some protocols intentionally try to push links to capacity, causing temporary overload as they try to find the limit 
+	* Some packet loss is inevitable  
+_The transport layer must adapt the quality of service provided by the network to match application needs._
+
+#### The End\-to\-End Argument
+
+**Is it better to place functionality within the network or at the end points?**  
+* Only put functionality that is absolutely necessary in the network, leave everything else to end systems
+	* Example: let the network provide best effort packet delivery, rather than try to detect and retransmit lost packets 
+	* If the network is not guaranteed to be 100% reliable, always, end systems must check for lost packets anyway
+	* Since 100% reliability can never be guaranteed, no point in complicating thenetwork trying to make it reliable 
+* One of the defining principles of the Internet
+
+#### Timeliness vs Reliability Trade\-off 
+
+* Repairing or retransmitting lost packets takes time
+* Fundamental trade\-off: 
+	* If a connection is to be reliable, it cannot guarantee timeliness
+	* If a connection is to be timely, it cannot guarantee reliability
+* Different applications make different timeliness vs. reliability trade\-offs:
+	* Web, email, etc. → data must be delivered in order sent; no strong timeliness requirement
+	* Telephony and video conferencing → tolerates some data loss, but requires timeliness 
+* Implication for network architecture: 
+	* Network layer should provide a timely but unreliable service
+	* Transport layer protocols can add reliability, if needed
+
+#### Packet Loss and UDP
+
+* UDP → unreliable, connectionless, datagram service
+	* Adds port numbers and a checksum to IP
+	* Does not provide reliability or congestion control – best effort packet delivery 
+* A substrate for building new transport protocols
+	* QUIC
+	* RTP
+	* DNS 
+
+#### Sending UDP Datagrams
+
+* The sendto\(\) call sends a single datagram 
+* Each call to sendto\(\) can send to a different address, even though they use the same socket
+* Alternatively, connect\(\) to an address, then use send\(\) to send the data 
+	* There is no connection made by the UDP layer, a connect\(\) call only sets the destination address for future packets
+
+#### Receiving UDP Datagrams
+
+* The recv\(\) call may be used to read a single datagram, but doesn’t provide the source address of the datagram
+* Most code uses recvfrom\(\) instead – this fills in the source address of the received datagram
+* Packets can be lost, delayed, or reordered in transit – UDP does not attempt to recover from this
+
+#### UDP Framing and Reliability
+
+* Each sendto\(\) calls generates exactly one UDP datagram
+	* Each recvfrom\(\) corresponds to a single sendto\(\)
+* But, UDP is unreliable: 
+	* Datagrams may be lost, delayed, reordered, or duplicated in transit 
+	* Data sent with sendto\(\) might never arrive 
+	* Data sent with sendto\(\) might arrive more than once
+	* Data sent in consecutive calls to sendto\(\) might arrive out\-of\-order
+	* UDP does not attempt to correct this
+* The protocol built on UDP is responsible for correcting the order, detecting duplicates, and repairing loss – if necessary 
+	* The protocol running within UDP generally includes a sequence number to support this
+	* e.g., RTP and QUIC both include a packet sequence number inside UDP packets
+* UDP provides framing – data is delivered a packet at a time – but is unreliable
+* Application must organise the data so it’s useful if some datagrams lost 
+	* e.g. video conferencing with I\- and P\-frames
+
+#### UDP Sequencing and Reliability
+
+**UDP does not attempt to provide sequencing, reliability, or timing recovery**  
+* It provides a best\-effort datagram delivery service, and identifies applications according to port numbers – substrate on which application protocols can be implemented 
+* The syntax and semantics of the datagrams depends on the application layer protocol running within UDP
+	* This might provide sequence numbers and acknowledgements 
+	* This might provide retransmission and/or forward error correction
+	* This might provide timestamps to recover timing
+	* This might provide payload identification, or other information
+
+#### TCP Service Model
+
+**Refer to 05c**
+
+#### Reliable Data Transfer with TCP
+
+* TCP delivers an ordered, reliable, byte stream
+* After connection established, client and server can send\(\) or recv\(\) data 
+	* Data can flow in either direction within a TCP connection
+	* No requirement that data transfers follow a request\-response pattern; client and server can send in any order
+* TCP ensures data delivered reliably and in order 
+	* TCP sends acknowledgements for segments as they are received; retransmits lost data
+	* TCP will recover original transmission order if segments are delayed and arrive out of order
+
+#### Reading and Writing Data on a TCP Connection 
+
+* The send\(\) function transmits data
+	* Blocks until the data can be written
+	* Might not be able to send all the data, if the connection is congested 
+	* Returns actual amount of data sent
+	* Returns \-1 if error occurs, sets errno
+* The recv\(\) function receives data 
+	* Blocks until data available or connection closed; reads up to BUFLEN bytes 
+	* Returns number of bytes read 
+	* If connection closed, returns 0 
+	* If error occurs, returns \-1 and sets errno
+	* Received data is not null terminated \- **This is a significant security risk**
+
+#### TCP Segments and Sequence Numbers
+
+* The send\(\) call enqueues data for transmission
+* Data is split into segments, each placed in a TCP packet
+* TCP packets sent in IP packets, when allowed by congestion control algorithm  
+	* Each segment has a sequence number
+	* Sequence numbers start from the value sent in the TCP handshake 
+	* Initial sequence number is sent in first packet sent from client→server \(the packet that has the SYN bit set to 1\); chosen randomly by the client 
+	* First data packet has sequence number one higher than the initial packet 
+	* Subsequent data packets increase sequence number by number of bytes sent
+* Separate sequence number spaces in each direction
+
+* Calls to send\(\) don’t directly map to TCP segments 
+	* If data given to send\(\) is too large to fit in one segment, TCP will split it across several segments 
+	* If data given to send\(\) is small, TCP might wait to send the data, combining it with later data into a single larger segment
+	* Known as Nagle's algorithm – improves efficiency, but adds some delay 
+* Implication: data returned by recv\(\) does not always correspond to a single send\(\) call
+
+#### TCP Does Not Preserve Message Boundaries
+
+* The recv\(\) call returns data reliably, and in the order sent, but doesn’t frame data 
+	* Desirable if one recv\(\) call would fetch all the HTTP headers, then another the entire body 
+	* TCP not does guarantee this – might split the response arbitrarily, e.g., matching the colours 
+	* Complicates code using TCP 
+* Implication: you must parse the data to know how much remains to be read
+
+#### TCP Acknowledgements
+
+**TCP receiver acknowledges each segment received**  
+* Each TCP segment has sequence number and acknowledgement number
+* Segments sent to acknowledge each received segment – contains acknowledgment number indicating sequence number of the next contiguous byte expected 
+	* Includes data if any ready to send, or can be empty apart from acknowledgement 
+* If a packet is lost, subsequent packets will generate duplicate acknowledgements 
+	* In example, segment with sequence number 8 is lost 
+	* When segment with sequence number 9 arrives, the receiver acknowledges 8 again – since that’s still the next contiguous sequence number expected
+* Can send delayed acknowledgements
+	* e.g., acknowledge every second packet if there is no data to send in reverse direction
+
+#### TCP Acknowledgements: Loss Detection 
+
+* TCP uses acknowledgements to detect lost segments 
+	* If data is being sent, but no acknowledgements return, then either receiver or the network failed
+	* TCP treats a timeout as an indication of packet loss and retransmits unacknowledged segments
+* TCP uses acknowledgements to detect lost segments
+	* Duplicate acknowledgements received → some data lost, but later segments arrived 
+	* TCP treats a triple duplicate acknowledgement – four consecutive acknowledgements for the same sequence number – as an indication of packet loss 
+	* Lost segments are retransmitted
+
+**Why a triple duplicate acknowledgement?**  
+* Packet delay leading to reordering will also cause duplicate acknowledgement to be generated
+* Gives appearance of loss, when the segments are merely delayed 
+* Use of triple duplicate ACK to indicate packet loss stops reordered packets from being unnecessarily retransmitted
+	* Packets delayed enough to cause one or two duplicate acknowledgements is relatively common 
+	* Packets being delayed enough to cause three or more duplicates is rare 
+	* Balance speed of loss detection vs. likelihood of retransmitting a packet that was merely delayed
+
+#### Head\-of\-line Blocking in TCP
+
+* A TCP receiver will wait for missing data to be retransmitted
+* Calls to recv\(\) block until missing data arrives; TCP always delivers data to the application in a contiguous, ordered, sequence
+* Head\-of\-line blocking increases total download time 
+* Delay depends on relative values of RTT and packet serialisation delay
+* Head\-of\-line blocking increases latency for progressive and real\-time applications
+* Significant latency increase if file is being played out as it downloads
+
+#### Reliable Data Transfer with TCP
+
+**TCP provides an ordered, reliable, byte stream service**  
+* Service model is simple to understand – it’s like reading from a file 
+* Head of line blocking can significantly impact progressive and real\-time uses 
+	* MPEG DASH \(“Dynamic Adaptive Streaming over HTTP”\)
+* Lack of framing can complicate application design
+
+#### QUIC Service Model
+
+* TCP delivers reliable, ordered, byte stream 
+* QUIC delivers several ordered reliable byte streams within a single connection
+	* Each stream is delivered reliably and in\-order 
+	* Order is not preserved between streams within a QUIC connection
+
+#### QUIC Packets and Sequence Numbers
+
+**Each QUIC packet has a Packet Number**  
+* Two packet number spaces
+	* Packets sent during initial handshake 
+	* Packets sent to carry data 
+* Within each space, packet number starts at zero, increases by one for each packet sent
+	* Counts number of packets sent
+	* Different to TCP, where the sequence number records the offset within the byte stream  
+**Each QUIC packet contains one or more frames**  
+* STREAM frames carry data
+* Each has a stream identifier, and carries the length of the data and its offset from start of stream – closer to TCP sequence numbers
+
+**QUIC doesn’t preserve message boundaries in streams**  
+* If data written to stream is too big for a packet, it will be split across multiple packets
+* If data written to stream is too small for a packet, it may be delayed and sent with other data to fill complete packet
+* Data from more than one stream might be sent in a single packet 
+* If \>1 stream has data to send, the QUIC sender can choose how to prioritise and deliver frames from each stream
+
+#### QUIC Acknowledgements
+
+* A QUIC receiver sends acknowledgements for packets it receives 
+	* Unlike TCP, it does not acknowledge sequence numbers within each stream 
+	* The sender needs to remember what data from each stream was in each packet, to know what parts of each stream have been received
+* Acknowledgements sent as reverse path frames
+* Acknowledgements can be delayed
+	* e.g., send acknowledgement after every second packet is received 
+	* The ACK Delay field measures this delay to allow accurate network RTT calculation 
+* Acknowledgements contain ranges 
+	* e.g., a single ACK Frame can indicate that packets 1\-4 and 6\-8 were received
+	* Like TCP Selective Acknowledgement extension
+
+#### QUIC Retransmissions and Loss Recovery
+
+* QUIC does not retransmit lost packets 
+	* Every packet has a unique packet number and is only transmitted once
+	* Packets declared lost when at least three later packets have been acknowledged \- _Equivalent to TCP triple duplicate ACK_
+	* Packets declared lost after timeout – like TCP
+* QUIC retransmits lost data in new packets
+	* Packetisation of STREAM frames into packets may differ when data retransmitted 
+	* Data ordering between streams not preserved
+
+#### Head\-of\-Line Blocking in QUIC
+
+**QUIC can deliver several streams within a single connection**  
+* Data for each stream is delivered reliability and in\-order 
+	* Whether packet loss affects one or more streams depends how the sender chooses to distribute stream data between packets 
+		* Each QUIC packet can contain data from one stream, alternating between streams 
+		* Each QUIC packet can contain data from each stream 
+		* The specification places no requirements on how streams are split across packets
+	* Depending on loss patterns, each stream can independently suffer head-of-line blocking 
+		* Affects performance of that stream in the same way head-of-line blocking affects TCP
+* Order is not preserved between streams within a QUIC connection
+	* One stream might be blocked waiting for a retransmission, while other streams continue to deliver data without loss
+	* Data from different streams is sent and received independently → careful use of streams can limit duration of head\-of\-line blocking
+
+#### Reliable Data Transfer with QUIC
+
+* QUIC delivers several ordered reliable byte streams within a single connection 
+	* Can be treated like several parallel TCP connections → instead of opening several TCP connections to a server, open one QUIC connection and send multiple streams within it
+	* Can be treated as a framing device → each stream represents a single object, with end-of-stream signalling the object is complete
+	* Order is not preserved between streams within a QUIC connection
+* Best practices for use of multiple streams are still evolving
