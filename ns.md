@@ -1644,3 +1644,341 @@ _The transport layer must adapt the quality of service provided by the network t
 	* Can be treated as a framing device → each stream represents a single object, with end-of-stream signalling the object is complete
 	* Order is not preserved between streams within a QUIC connection
 * Best practices for use of multiple streams are still evolving
+
+## Week 6
+
+#### TCP Congestion Control
+
+* Congestion control principles
+* Loss\-based congestion control 
+	* How to effectively make use of network capacity 
+		* TCP Reno 
+		* TCP Cubic
+* Delay\-based congestion control 
+	* Reducing TCP\-induced latency
+		* TCP Vegas 
+		* TCP BBR
+* Explicit congestion notification
+* TCP is a complex, highly optimised, protocol 
+
+#### QUIC Congestion Control
+
+* The QUIC v1 standard adopts congestion control as used in TCP Reno 
+* QUIC implementations tend to use Cubic or BBR congestion control in practice
+
+#### Congestion Control Principles
+
+* Key congestion control principles:
+	* Packet loss as a congestion signal 
+	* Conservation of packets in flight
+	* Additive increase/multiplicative decrease
+* Practical TCP congestion control: 
+	* Robust IETF standards for TCP 
+	* Embodies congestion control principles 
+	* Extremely high performance
+
+#### Key Principles: Packet Loss as a Congestion Signal
+
+* Data flows from sender to receiver through a series of IP routers
+* Routers perform two functions: 
+	* Routing: receive packets, determine appropriate route to destination 
+	* Forwarding: enqueue packets on outgoinglink for delivery
+		* Queues shrink if packets are forwarded faster than they arrive  
+		* Queues grow if packets arrive faster than they can be forwarded 
+		* Queues have maximum size → packets discarded if the queue is full 
+		* Congestion control can use this packet loss as a congestion signal
+
+#### Key Principles: Conservation of Packets
+
+* Acknowledgements returned by receiver
+	* Send one packet for each acknowledgement received
+	* Total number of packets in transit is constant
+		* System is in equilibrium; queues neither increase nor decrease in size 
+		* ACK clocking – each acknowledgement “clocks out” the next packet 
+* Automatically reduces sending rate if network gets congested and delivers packets more slowly
+
+#### Key Principles: AIMD Algorithms
+
+* Sending rate follows additive increase, multiplicative decrease \(AIMD\) algorithm 
+	* Start slowly, increase gradually to find equilibrium
+		* Add a small amount to the sending speed each time interval without loss 
+		* For a window-based algorithm w<sub>i</sub> = w<sub>i\-1</sub> \+ α each RTT, where α = 1 typically
+	* Respond to congestion rapidly 
+		* Multiply sending window by some factor β < 1 each interval loss seen
+		* For a window\-based algorithm w<sub>i</sub> = w<sub>i-1</sub> × β each RTT, where β = 1/2 typically 
+	* Faster reduction than increase → stability; TCP Reno
+
+#### Congestion Control in TCP Reno
+
+* TCP uses window\-based congestion control
+	* Maintains a sliding window onto the available data that determines how much can be sent according to the AIMD algorithm
+	* Plus slow start and congestion avoidance
+	* Gives approximately equal share of the bandwidth to each flow sharing a link
+* Basic congestion control algorithm known as TCP Reno
+
+#### From Stop\-and\-Wait to Sliding Window Protocols
+
+* Stop\-and\-wait protocols perform poorly
+	* It takes time, t<sub>s</sub>, to send a packet
+		* t<sub>s</sub> = \(packet size\) / \(link bandwidth\)
+	* Acknowledgement returns t<sub>RTT</sub> seconds later
+	* Link utilisation, U = t<sub>s</sub> / t<sub>RTT</sub>
+		* Fraction of time link is sending packets → want U ≈ 1.0 
+* Sliding window protocols improve on stop\-and\-wait by sending more than one packet before stopping for acknowledgement
+
+#### Sliding Window Protocols Improve Link Utilisation
+
+Sliding window protocols improve link utilisation using a congestion window – number of packets to be sent before an acknowledgement arrives.
+
+Each returning acknowledgement for new data slides the window along, releasing next packet for transmission → if window sized correctly, each acknowledgement arrives just in time to release next packet.
+
+What is the optimal size for the window? bandwidth × delay of path → **but neither is known to the sender**
+
+#### TCP Reno Congestion Control
+
+* TCP Reno is a sliding window protocol 
+	* Optimised for not having information to know the correct window size 
+* How to find the path capacity? 
+	* Slow start to estimate the bottleneck link capacity
+	* Congestion avoidance to probe for changes in capacity
+
+#### TCP Reno: Choosing the Initial Window
+
+* How to choose initial window size, W<sub>init</sub>? 
+	* No information → need to measure path capacity
+	* Start with a small window, increase until congestion 
+	* W<sub>init</sub> = 1 packet per round\-trip time \(RTT\) is safe
+		* Start at the slowest possible rate, equivalent to stop\-and\-wait, and increase
+	* W<sub>init</sub> = 3 packets per RTT
+		* Traditional TCP Reno approach 
+	* W<sub>init</sub> = 10 packets per RTT
+		* Modern TCP implementations
+		* Compromise between safety and performance – measurements show this is generally safe at present 
+		* Expect W<sub>init</sub> to gradually be increased as average network performance improves
+
+#### TCP Reno: Finding the Path Capacity
+
+* The initial window allows you to send something
+	* Unlikely to be the optimal window size 
+	* How to choose the correct window size to match the link capacity?
+		* Slow start to rapidly find the correct window size for the path 
+		* Congestion avoidance to adapt to changes in path capacity once connection is running
+
+#### TCP Reno: Slow Start
+
+* Assume W<sub>init</sub> = 1 packet per RTT – slow start to connection
+	* It will be W<sub>init</sub> = 3 or W<sub>init</sub> = 10 in practice
+* Rapidly increase window until network capacity is reached 
+	* Each acknowledgement for new data increases congestion window, W, by 1 packet per RTT → congestion window doubles each RTT
+	* If a packet is lost, halve congestion window back to previous value and exit slow start
+
+* TCP Reno slow start phase:
+	* Starts sending slowly 
+	* Rapidly increases sending rate until a packet is lost
+	* Resets sending rate to last known good rate when first loss occurs
+
+#### TCP Reno: Congestion Avoidance
+
+* After first packet is lost, TCP switches to congestion avoidance
+	* The congestion window is now approximately the right size for the path
+	* Goal is now to adapt to changes in network capacity
+		* Perhaps the path capacity changes – radio signal strength changes for mobile device
+		* Perhaps the other traffic changes – competing flows stop; additional cross\-traffic starts
+	* Additive increase, multiplicative decrease of congestion window
+
+* If a complete window of packets is sent without loss:
+	* Increase congestion window by 1 packet per RTT, then send next window worth of packets 
+	* Slow, linear, additive increase in window: W<sub>i</sub> = W<sub>i-1</sub> + 1
+
+* If a packet is lost and detected via triple duplicate acknowledgement:
+	* Transient congestion, but data still being received
+	* Multiplicative decrease in window: W<sub>i</sub> = W<sub>i-1</sub> × 0.5
+	* Rapid reduction in window allows congestion to clear quickly, avoids congestion collapse 
+* Then, return to additive increase until next loss
+
+* If a packet is lost and detected via timeout:
+	* Either receiver or path has failed – reset to W<sub>init</sub> and re\-enter slow start
+	* How long is the timeout? 
+		* T<sub>rto</sub> = max\(1 second, average RTT + \(4 x RTT variance\)\)
+
+#### Congestion Window Growth, Buffering, Throughput
+
+* Bottleneck buffer size = bandwidth × delay
+* Bottleneck queue never empty 
+* Bottleneck link never becomes idle → sending rate varies, but receiver sees continuous flow 
+* Congestion window follows a “sawtooth” pattern, but received rate is constant at approximately bottleneck bandwidth
+
+#### TCP Reno: Summary
+
+* TCP Reno is effective at keeping bottleneck link fully utilised 
+	* Trades some extra delay to maintain throughput 
+	* Provided sufficient buffering in the network: buffer size = bandwidth × delay 
+	* Packets queued in buffer → delay 
+* Limitations: 
+	* Assumes packet loss is due to congestion; non-congestive loss, e.g., due to wireless interference, impacts throughput 
+	* Congestion avoidance phase takes a long time to use increased capacity
+
+#### TCP Performance on Fast Long\-distance Networks
+
+* TCP Reno can perform poorly on fast long\-distance networks
+	* e.g., multi\-gigabit per second inter\-continental links
+	* Path with 10Gbps bandwidth and 100ms RTT requires congestion window \~100,000 packets 
+	* In congestion avoidance, one packet lost and detected via triple duplicate ACK halves the window, then increase by 1 packet per RTT → 50,000 RTTs to recover sending rate 
+		* Approximately 1.4 hours with 100ms RTT!
+
+#### TCP Cubic
+
+* TCP Cubic changes the congestion control algorithm 
+	* During congestion avoidance, increases congestion window faster than TCP Reno on fast long\-distance networks
+	* Rapidly increases congestion window after packet loss
+	* Slows rate of increase as window approaches the largest successfully achieved window
+
+#### TCP Cubic Congestion Control
+
+* On packet loss during congestion avoidance, TCP Cubic reduces congestion window: W<sub>i</sub> = W<sub>i-1</sub> × 0.7
+	* TCP Reno uses W<sub>i</sub> = W<sub>i-1</sub> × 0.5  
+	* TCP Cubic is more aggressive
+* After packet loss during congestion avoidance, TCP Cubic increases the congestion window as: W<sub>cubic</sub> = C\(t \- K\)<sup>3</sup> + W<sub>max</sub>
+	* W<sub>max</sub> is the maximum window size reached before the loss 
+	* t is the time since the packet loss
+	* K is the time it will take to increase the window back to W<sub>max</sub>, assuming no further packet losses 
+	* C = 0.4 is a constant that controls fairness to TCP Reno
+* Many additional details included to ensure fairness with TCP Reno on slower, shorter\-RTT, networks
+
+#### TCP Cubic vs Reno
+
+* TCP Cubic is default in most modern operating systems
+	* Much more complex than TCP Reno – core response is relatively straight\-forward 
+	* Much complexity ensures fairness with TCP Reno in its typical operating regime; improves performance for networks with longer RTT and higher bandwidth
+* Both algorithms use packet loss as congestion signal and eventually fill router buffers
+	* Trade latency for throughput
+
+#### Impact of TCP on Latency
+
+* TCP Reno and TCP Cubic both aim to fill the network
+
+* TCP Reno and Cubic use packet loss as congestion signal → increase congestion window until queue overflows and packet is lost
+* No matter how much big the queue, TCP Reno or Cubic will cause it to overflow, if given enough data to send 
+* Packets waiting in queues within network adds latency → increase RTT 
+
+#### TCP Vegas: Reducing Latency
+
+* Key insight: if sending faster than the network can deliver, packets will be queued 
+	* TCP Reno and Cubic wait until the queue overflows and packets are lost before slowing down 
+	* TCP Vegas watches for the increase in delay as the queue starts to fill up → slows down before the queue overflows 
+		* Queues are smaller → lower latency
+		* Packets are not lost, so don’t need retransmission
+	* Only affects congestion avoidance; slow start unchanged
+
+#### TCP Vegas Congestion Control
+
+* Measure BaseRTT 
+	* The smallest time between sending a packet and getting its acknowledgement 
+	* BaseRTT will be from a packet delivered without much queueing
+* Calculate ExpectedRate = W / BaseRTT
+	* The congestion window, W, determines how many packets are sent each RTT 
+	* If the network can support this sending rate, the complete window should be delivered within the RTT
+* Measure ActualRate
+	* Bytes sent divided by actual RTT, for each packet
+	* Measure how fast packets are actually received, based on acknowledgements returned 
+	* ActualRate ≤ ExpectedRate since packets can’t be delivered faster than they’re sent
+
+* Compare ExpectedRate with ActualRate and adjust window:
+	* If ExpectedRate \- ActualRate < R<sub>1</sub> then additive increase to window 
+		* Data arriving at close to expected rate, can likely send faster 
+	* If ExpectedRate - ActualRate \> R<sub>2</sub> then additive decrease to window
+		* Data arriving slower than it’s being sent, slow down
+	* Parameters R<sub>1</sub> and R<sub>2</sub>, where R<sub>1</sub> < R<sub>2</sub>, critical to performance
+
+#### TCP Vegas: Limitations
+
+* Delay\-based congestion control is a good idea in principle 
+	* Reduces latency
+	* Reduces packet loss 
+* But loss\- and delay\-based congestion control don’t cooperate
+	* TCP Reno and TCP Cubic aggressively increase queue sizes 
+	* Increases RTT and reduces ActualRate as measured by TCP Vegas
+	* Forces TCP Vegas to slow down; cycle repeats → TCP Vegas sending rate drops to zero over time 
+
+* TCP Vegas is not used, because it can’t be deployed alongside TCP Reno or TCP Cubic
+
+#### TCP BBR
+
+* Is it possible to develop a delay-based congestion control algorithm for TCP that can be deployed on a network alongside TCP Reno and TCP Cubic? 
+* Maybe – TCP BBR \(“Bottleneck Bandwidth & RTT”\) is one attempt 
+	* Proposal from Google – measures RTT and bandwidth of the bottleneck link, directly sets congestion window 
+	* Used by YouTube in some cases, but highly experimental
+	* TCP BBR v2 in development, might solve these problems – this is an active research area
+
+#### Explicit Congestion Notification
+
+* TCP has inferred congestion through measurement
+	* TCP Reno and Cubic → packets lost when queues overflow
+		* Problematic because it increases delay
+		* Problematic because of non\-congestive loss on wireless links 
+* TCP Vegas → increase in delay as queues start to fill 
+	* Conceptually a good idea, but difficult to deploy when competing with TCP Reno and Cubic 
+* Why not have the network tell TCP congestion is occurring? 
+	* Explicit Congestion Notification \(ECN\) field in IP header
+	* Tell TCP to slow down if it’s overloading the network
+
+#### ECN and IP
+
+* Sender sets ECN bits on transmission:
+	* 00 = Doesn’t support ECN, 01 = ECN capable
+* If congestion occurs, congested router sets ECN bits to 11 \(“congestion experienced”\) 
+	* Indicates that a queue of packets for some link is getting full, but has not yet overflowed – signal of congestion set by the network
+	* If the queue overflows, packets are dropped 
+* Cooperation between network and endpoints
+
+#### ECN and TCP
+
+* Receiver may get a TCP segment within an IP packet marked ECN Congestion Experienced \(ECN\-CE\) 
+* ECN Echo \(ECE\) field in TCP header allow it to signal this back to the sender
+
+* Sender reduces congestion window on receiving acknowledgement with ECE = 1 as if the packet had been lost
+* Sets CWR = 1 in next packet to inform network and receiver it has done so
+
+* ECN lets TCP react to congestion before packet loss occurs 
+	* Routers signal congestion before queues overflow
+	* Independent of choice of TCP congestion control algorithm 
+	* Smaller queues → reduces latency, beneficial for video conferencing and gaming
+
+* ECN extensions also exist in QUIC and RTP
+
+#### ECN and TCP: Deployment
+
+* TCP endpoints needed to be updated to support ECN → done 
+	* Endpoints now support ECN and many now enable ECN by default 
+		* ECN was widely implemented but disabled\-by\-default for many years, due to concerns that it wouldn’t pass through firewalls
+		* Apple forced firewalls to be fixed: iOS 9 enabled ECN for 5% of connection;iOS 10 for 50%; iOS 11 and later for all connections 
+* Most routers support ECN, relatively few enable it by default
+	* Endpoints can react to ECN signals, but network is currently unlikely to provide them 
+	* Starting to change – e.g., recent DOCSIS cable modems enable ECN
+	* Will take time, but latency reduced as ECN is enabled throughout the network
+
+#### Light Speed?
+
+* Two factors impact latency for data transfer 
+	* The time packets spend in queues within the network 
+		* Impact of TCP congestion control algorithm
+		* ECN to signal congestion before queues overflow
+	* The time packets spend propagating down the links between routers
+		* Speed at which light propagates through an optical fibre
+		* Speed at which electrical signals propagate down a wire 
+		* Speed at which radio signals propagate through the air
+
+#### Reducing Propagation Delay
+
+* Physically shorter links have lower propagation delay
+	* Significant reduction in latency by laying new cables that follow great circle routes between popular destinations 
+	* e.g., ocean floor cable from Japan to Europe via the north pole, rather than Pacific Ocean – US – Atlantic Ocean
+
+* Signals propagate at the speed of light in the transmission medium
+	* Speed of light in optical fibre \~200,000 km/s
+	* Speed of light in vacuum 299,792 km/s 
+* SpaceX Starlink deploying \~4,000 low earth orbit communications satellites 
+	* \~47% reduction in latency since signals sent through vacuum rather than optical fibre
+	*  With careful routing, satellite path can follow close to the most direct great circle route 
+
+What application cares so much about reducing latency to spend $billions launching >4,000 satellites? Or new undersea cables? High frequency share trading.
