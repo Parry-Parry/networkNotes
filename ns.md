@@ -1982,3 +1982,1039 @@ What is the optimal size for the window? bandwidth × delay of path → **but ne
 	*  With careful routing, satellite path can follow close to the most direct great circle route 
 
 What application cares so much about reducing latency to spend $billions launching >4,000 satellites? Or new undersea cables? High frequency share trading.
+
+## Week 7
+
+#### What is Real\-time Traffic?
+
+* Defining characteristic: deadlines
+	* The system fails if data is not delivered by a certain time
+		* Railway signalling must deliver data to change a signal before train arrives – hard real\-time
+		* Streaming video should deliver a new frame every 60th of a second, else the movie playback stutters – soft real\-time
+		* What is the probability a deadline is missed? What are the consequences? Engineer accordingly – no system is 100% reliable
+	* Deadlines can be absolute or relative
+		* Data must be delivered before a certain time – absolute deadline
+		* Data must be delivered periodically, within some time after the previous – relative deadline
+* Real\-time is not necessarily high performance 
+	* It requires predictable timing, not necessarily high bandwidth or low latency
+
+#### Requirements for Streaming Applications
+
+* Video on demand has no absolute deadline, but needsregular data to prevent stalls once started
+	* Acceptable if a takes a few seconds to start the video 
+	* Playback should be smooth once it starts 
+* Live video may have absolute deadlines 
+* Bit rate depends on desired quality
+	* Higher quality is better, up to limits of display 
+	* Predictable, but lower, quality often preferred to more variable, but on average higher, quality 
+* For a given bit rate, trade\-off between frame rate and frame quality
+	* Smoother motion or higher resolution?
+
+#### Requirements for Interactivity
+
+* Requirements for interactive applications determined bytask and human perception
+	* Phone call or video conference 
+		* One\-way mouth\-to\-ear delay \~150ms maximum for telephony
+		* Video conferences want to lip\-sync audio and video: audio no more than 15ms ahead or 45ms behind
+	* Lecture style 
+		* Mostly unidirectional with occasional questions → can toleratemuch higher latency 
+	* Distributed music performance 
+		* One\-way latency ≪ 50ms desirable 
+		* Speed of sound: \~15ms to go from one side of a large orchestra to the other
+
+#### Real\-time Traffic Must Be Loss Tolerant
+
+* The Internet is a best effort packet network
+	* Timing is not guaranteed – depends on the amount of queueing on the path and on the path taken
+	* Packets can be lost – retransmissions take time, and may not arrive before the deadline
+	* In some networks these effects can be significant – with careful engineering they can be insignificant 
+* Real\-time applications need to be loss tolerant
+
+#### Real\-time Traffic Has Limited Elasticity
+
+* TCP congestion control adapts transmission speed to match available capacity 
+* Many transfers are elastic – faster is better, but it doesn’t matter what rate the congestion control selects 
+	* The application can adapt to any chosen rate 
+* Real\-time traffic is inelastic
+	* Media has a minimum rate, below which it cannot be used 
+		* e.g., a minimum quality level below which the speech is unintelligible, that needs a certain bit\-rate to transmit
+		* If the congestion control algorithm cannot sustain this rate – if the network has insufficient capacity – real-time traffic cannot be used 
+	* Media has a maximum rate → cannot consume more
+		* Video limited by capture frame rate and resolution
+		* Audio limited by capture sampling rate
+
+#### Quality of Service \(QoS\) Guarantees
+
+* It may be possible to reserve network capacity for real\-time traffic 
+	* Using RSVP, MPLS, 5G network slicing, ... 
+	* Requires flow setup signalling, authorisation, and accounting 
+		* Need to tell the network what resources the real\-time traffic requires
+		* Need to demonstrate that sender is allowed to reserve these resources and can pay for the reserved capacity – reservations prevent other users from accessing the network, so have some cost 
+	* If the network has capacity for the traffic, reservations don’t help 
+	* If the network does not have capacity, they allow the operator to discriminate in favour of customers who are willing to pay
+		* Some customers care enough to pay for reserved capacity
+		* Inter\-domain reservations and accounting can be difficult to agree and implement
+		* Many operators find it cheaper and easier to just buy more capacity, so no need to reserve
+
+#### Quality of Experience \(QoE\)
+
+* What ultimately matters is subjective quality of experience
+	* Does the application meet user needs?
+	* Does the application allow users to communicate effectively? 
+	* Does the application provide compelling entertainment?
+* QoE is not a one\-dimensional metric 
+	* What aspect of user experience are you evaluating?
+		* e.g., “Does it sound good” is not the same as “Can you understand it?"
+	* How does your metric relate to the task being performed? 
+	* Some aspects of user experience can be estimated from technical metrics 
+		* e.g., the ITU\-T E\-model for speech quality evaluation based on latency and packet loss
+	* Some aspects are subjective and task dependent – need user trials
+
+#### Interactive Conferencing Applications
+
+* What are interactive applications? 
+	* Telephony 
+	* Voice\-over\-IP \(VoIP\) 
+	* Video conferencing
+* Long history of research and standardisation:
+	* Network Voice Protocol \(NVP\) 
+		* Packet voice experiments over the ARPAnet 
+	* Modern standards development from mid\-1990s
+		* Mbone conferencing tools  
+		* SIP, SDP, and RTP protocols
+		* Adopted by 3GPP as basis of mobile telephone standards
+	* Browser\-based conferencing from mid\-2010s 
+		* WebRTC
+
+#### Requirements on Timing and Data Rate
+
+* Interactive conferencing has tight latency bounds 
+	* User experience degrades gracefully
+* Data rates depend on media type and encoding options
+	* Speech coding typically operates on 20ms packets
+		* Captures one frame of speech every 20ms, encodes, transmits 
+		* Data rate \~tens of kilobits per second 
+		* Background noise during quiet periods encoded at lower quality, packets sent less often 
+* Video frame rate and resolution highly variable 
+	* High definition video encoding using H.264 is around 2\-4Mbps  
+	* Frame rates between 25 and 60fps commonly used 
+	* I\-frames → tens of packets; P\-frames → single or few packets
+
+#### Reliability Requirements
+
+* Speech data is highly loss tolerant 
+	* Loss concealment can hide 10\-20% random packet loss without noticeable loss in quality
+	* Burst losses are less well concealed 
+* Video packet loss hard to conceal 
+	* No scene changes to reset decoder state to known good value
+	* Retransmissions possible in some cases; forward error correction more typical
+
+#### Interactive Applications: Media Transmission Path
+
+* Frames of media data are captured periodically 
+* Codec compresses media frames 
+* Compressed frames fragmented into packets 
+	* Transmitted using RTP inside UDP packets 
+	* RTP protocol adds timing and sequencing, sourceidentification, payload identification
+* Transmitted over the network
+
+#### Interactive Applications: Media Reception Path
+
+* UDP packets containing RTP protocol data arrive 
+	* Separated according to sender 
+* Channel coder repairs loss using forward error correction 
+	* Additional packets sent along with the media, to allow some repair without needed retransmission
+* Playout buffer used to reconstruct order, smooth timing 
+* Media is decompressed, packet loss concealed, and clock skew corrected 
+* Recovered media is rendered to user
+
+#### Internet Multimedia Standards
+
+* Media: secure RTP, WebRTC data channel
+* Path discovery and NAT traversal: ICE, STUN, TURN → Lecture 2
+* Session descriptions: SDP
+* Signalling protocols for different purposes
+	* Announcing multicast sessions: SAP – obsolete
+	* Control of streaming media: RTSP
+	* Control of interactive conferencing: SIP 
+	* Control of telepresence: CLUE – not widely used
+	* Control of web\-based interactive media: JSEP \(WebRTC\)
+
+#### Media Transport: RTP
+
+* Separate data and control channels 
+	* RTP – media payload formats 
+	* RTP Control Protocol \(RTCP\) 
+		* Source description and caller identity, reception quality, codec control 
+* Payload formats 
+	* Codec\-specific packet formats; application level framing; robust, but complex
+	* Each frame packetised for independent use for low latency
+* Datagram TLS handshake – usual TLS handshake but within UDP packets
+* Extensions 
+	* Reception quality and user experience monitoring 
+	* Codec control and other feedback 
+	* Circuit breakers and congestion control 
+
+* RTP data packets carried within UDP 
+* Header information carries: 
+	* Sequence number and timestamp 
+		* Allows receiver to reconstruct ordering and timing 
+	* Source identifiers 
+		* Who sent this packet – needed for multiparty calls 
+	* Payload format identifier 
+		* Does the packet contain audio or video? 
+		* What compression algorithm is used? 
+
+#### Media Transport: Timing Recovery 
+
+* Variable queueing delays in the network disrupt timing – receiver buffers to smooth out variation
+* If packets played out immediately on arrival, variation in timing leads to gaps
+* Delay playout by more than typical variation in inter\-arrival time, to allow smooth play back
+
+#### Media Transport: Application Level Framing
+
+* Packet loss is possible, so receivers must make best use of packets that do arrive
+* RTP payload formats define how compressed audio/visual data is formatted into RTP packets
+	* Goal: each packet should be independently usable
+	* If a packet arrives, it should be possible to decode all the data it contains – not always possible, but desirable
+	* Naïve packetisation can lead to inter\-packet dependencies where a packet arrives but can’t be decoded because some previous packet, on which it depends, was lost
+
+#### Media Transport: FEC vs. Retransmission
+
+* Retransmission possible, but often takes too long – packet should have been played out before retransmission arrives
+* Forward error correction \(FEC\) often used instead
+* Additional FEC packets are sent along with the original data 
+	* Contain error correcting codes
+	* e.g., the Exclusive\-OR \(XOR\) of the original packets – many different FEC schemes
+* If some original packets are lost but the FEC packets arrive, original data can be reconstructed
+
+#### Media: WebRTC Data Channel
+
+* In addition to audio\-visual media, WebRTC providesa peer\-to\-peer data channel
+	* For peer\-to\-peer file transfer 
+	* To support a chat session 
+	* To support reactions, raise hand, etc.
+
+#### Media: WebRTC Data Channel
+
+* WebRTC data channel using SCTP in a secure UDP tunnel: 
+	* Transparent data channel 
+		* Message\-oriented abstraction
+		* Multiple sub\-streams 
+		* Congestion controlled 
+	* Makes it straight-forward to build P2P applications with WebRTC
+* Why not use QUIC? Because WebRTC pre\-dates the development of QUIC 
+	* Future versions of WebRTC will likely migrate to using QUIC 
+	* QUIC is more flexible and more highly optimised
+
+#### Signalling and Session Descriptions
+
+* Media transport flows peer\-to\-peer for low latency
+* A signalling protocol is needed to find the peerand establish the paths 
+* The control protocol needs to describethe communication session expected:
+	* Media transport connections required
+	* Media formats and compression algorithms
+	* IP addresses and ports to use 
+	* Originator and purpose of session
+	* Options and parameters
+* Session description protocol \(SDP\) provides a standard format for such data
+
+#### Session Descriptions: SDP Offer/Answer
+
+* Interactive sessions require negotiation
+	* An offer to communicate: lists codecs, optionsand addressing details, identity of caller 
+	* The answer subsets codecs and options to thosemutually acceptable, supplies addressing details, and confirms willingness to communicate
+	* ICE algorithm probes NAT bindings, establishes path 
+	* Audio and video data flows 
+* SDP used as the negotiation format 
+	* SDP was not designed to express options and alternatives
+	* Insufficient structure in syntax, semantic overloading 
+	* Complex → but complexity not initially visible; now too entrenched for alternatives to take off
+
+#### Control of Interactive Conferencing: SIP
+
+* The signalling protocol sets up the call 
+	* Session Initiation Protocol \(SIP\) for telephony and video conferencing 
+	* Conferencing servers with public IP addresses handle callsfor a domain
+	* SIP messages sent from initiator to responder via servers 
+		* Determine location of responder 
+		* Discover NAT bindings 
+		* Negotiate parameters and options for the call 
+		* An offer/answer exchange using SDP to describe the session being created 
+	* Alert the responding user – make phone ring! – and agree to setup a call 
+		* NAT binding discovery and connection probing takes place while alerting 
+	* Media then flows over direct peer\-to\-peer path
+
+#### Browser\-based Conferencing: WebRTC
+
+* WebRTC is an alternative signalling protocol  
+	* Implemented in web browsers
+	* Exposes standard JavaScript API 
+	* Signalling messages delivered via HTTP to web server controlling the call 
+		* Offer/answer exchanges using SDP
+	* Media transport uses RTP – same as SIP
+	* Adds peer\-to\-peer data channel
+	* Designed to integrate video conferencing into web browsers and web applications
+
+#### Future Directions for Interactive Applications
+
+* New media types – holographic, tactile, augmented and virtual reality 
+	* Every stricter requirements on quality and latency 
+	* All can fit within the basic framework described 
+* Media over QUIC? 
+	* Active research and standardisation – expect rapid developments in this space
+
+#### Streaming Video Applications
+
+* RTP should be usable for streaming video
+	* Real\-time Streaming Protocol \(RTSP\) developedby Real Networks for Internet TV in late 1990s 
+	* Uses unidirectional RTP for video delivery 
+	* Very low latency, loss tolerant 
+* Most video\-on\-demand, TV, and movies are delivered instead over HTTPS
+	* Performance is significantly worse, very high latency, but startup latency is less critical
+	* Integrates better with content distribution networks
+
+#### HTTP Content Distribution Networks
+
+* There is an extensive, well\-developed, content distribution infrastructure
+* Highly effective for delivering and caching HTTP content 
+* Global deployment – agreements with most large ISPs to host caching proxy servers
+* Only works with HTTP\-based content – does not support RTP\-based streaming
+
+#### HTTP Adaptive Streaming \(a.k.a. MPEG DASH\)
+
+* Deliver video over HTTPS to make use of content distribution networks 
+	* Video content encoded in multiple chunks
+		* Each chunk encodes \~10 seconds of video
+		* Each chunk independently decodable 
+		* Each chunk made available in many different versions at different encoding rates
+	* A manifest file provides an index for what chunks are available 
+	* Clients fetch manifest, download chunks in turn 
+		* Standard HTTPS downloads 
+		* But monitor download rate, and choose what encoding rate to fetch next – adaptive bitrate 
+		* Playout chunks in turn, as they download
+
+#### DASH: Chunked Media Delivery and Rate Adaptation
+
+* Each chunk encodes \~10 seconds of video content 
+* Each chunk is compressed multiple times at different encoding rates \(i.e., different sizes\) 
+	* e.g., Netflix suggests encoding at ten different rates
+* Receiver fetches manifest, containing the list of all versions of all each chunk
+* Receiver fetches each chunk in turn 
+	* Measures download rate and comparesto the encoding rate 
+	* If download rate slower then encoding rate, then switch to lower encoding rate for next chunk
+	* If download rate faster than encoding rate, consider fetching higher rate for next chunk 
+* Chooses encoding rate to fetch based on TCP download rate
+
+#### DASH and TCP Congestion Control
+
+* DASH rate adaptation and TCP congestion control work at different time scales 
+	* TCP adjusts congestion window once per RTT 
+		* TCP Reno or Cubic 
+		* AIMD algorithm 
+	* DASH receiver measures average download speed of TCP connection over \~10 seconds
+		* Selects size of next chunk to download based on average TCP download speed 
+* Videos played using DASH often have relatively poor quality for first few seconds 
+	* Receiver picked a conservative download rate – relatively poor quality, small size – to start 
+	* Uses that to measure connection download speed, then switches to more appropriate rate
+
+#### DASH Latency
+
+* Multi\-second playout latency common, due to: 
+	* Chunk duration 
+	* Playout buffering 
+	* Encoding delays for live streaming 
+* Chunk duration is a key – must download complete chunk before starting playout 
+	* Download and decompress chunk n
+	* Start playing chunk n and while playing download chunk n\+1 
+	* No packets lost → latency equals chunk duration
+
+#### Sources of Latency: TCP
+
+* If a packet is lost, TCP retransmits after triple duplicate ACK 
+	* This takes time, and delays download of the chunk: 
+		* 4× packet transmission latency \(the lost packet, plus three following that generate duplicate ACKs\)
+		* 1× network RTT to retransmit packet 
+	* Each packet loss and retransmission will increase chunk download time – and causes TCP to reduce its window 
+* Both add latency if using TCP
+
+#### Sources of Latency: Chunks and Video Compression
+
+* Each chunk of video is independently decodable 
+	* Can’t compress based on previous chunk, because previous chunk depends on the network capacity → unpredictable 
+* Each chunk therefore starts with an I\-frame, followed by P\-frames 
+	* I\-frames are large: often 20× size of P\-frames
+	* If chunks are smaller duration → contain fewer P\-frames compared to number of I\-frames; video compression ratio goes down 
+* Trade\-off between chunk size and compression overhead 
+	* Large chunks require less data, but add latency 
+	* Small chunks reduce latency, but need more data 
+	* Overheads become excessive for chunk duration ≲ 2 seconds
+
+#### Future Directions for Streaming Video
+
+* Streaming video over WebRTC? 
+	* Web browsers now all support WebRTC 
+	* Intended for interactive conferencing, but entirely usable for RTP\-based video streaming to browser
+	* Much lower latency than DASH
+	* Will this encourage CDNs to support RTP? 
+* Streaming video over QUIC? 
+	* HTTP/3 is a drop\-in replacement for existing HTTP stack, and delivers requests over QUIC
+	* YouTube already delivers video over QUIC this way – expect to see much more deployment and special purpose QUIC extensions for video
+
+## Week 8
+
+#### What is the DNS
+
+* IP packets contain addresses rather than names 
+	* Designed for efficient processing by routers determining where to forward the packet 
+	* Not human readable – people prefer names, not addresses 
+* Domain name system \(DNS\) is a distributed database; maps names to IP addresses
+
+#### Structure of DNS Names
+
+* Naming is hierarchical 
+	* Sub\-domains first 
+	* Concludes with a top\-level domain \(TLD\) 
+		* Country\-code top-level domains \(ccTLDs\)
+		* Generic top\-level domains \(gTLDs\) 
+	* Top\-level domains live within the DNS root
+		* The root servers advertise the top\-level domains
+		* They have well\-known, fixed, IP addresses – new DNS resolvers need to reach them to find the TLDs before they can answer DNS queries
+* Each level is independently administered and operated 
+	* DNS is a distributed database – in authority and implementation  
+	* Each level in the hierarchy controls its own data
+
+#### DNS Name Resolution
+
+* The DNS is used for name resolution
+	* Given a name, lookup a particular type of record relating to that name
+	* Many different types of record: A, AAAA, CNAME, MX, NS, SRV, ...
+	* Most common are A and AAAA records, that map hostnames to IPv4 and IPv6 addresses,  and NS records that identify the name server for a domain 
+* A DNS client asks its resolver to perform the lookup by calling getaddrinfo\(\)
+	* The resolver could be a process running on the client, it more commonly runs on a machine provided by the network operator
+
+* If the resolver has no information, it makes a recursive query via the DNS root servers 
+	* Query the root to find the TLD 
+	* Query the TLD to find the subdomain 
+		* Repeat as necessary 
+	* Query the subdomain to find the address
+
+* Responses include a time to live that allows a resolver to cache the value for a certain time period
+	* Subdomains can set a short TTL and give different answers each time a particular name is requested → load balancing; CDNs directing queries to local caches 
+* Subsequent queries are answered from the cache, where possible 
+	* If the cached entry times it, it’s refreshed from the next level up in the hierarchy 
+	* Eventually reaching the DNS root 
+* The IP addresses for the root servers are well known, and never time out
+
+#### Structure of DNS Names
+
+* DNS names are assigned in a hierarchy – subdomains delegated from a top\-level domain delegated from the DNS root 
+	* What top\-level domains exist? 
+	* What policy does each top\-level domain have for allocating sub\-domains? 
+	* Who decides when to add new top\-levels domains? 
+	* Who controls the DNS root?
+
+#### From IANA to ICANN 
+
+* The set of top-level domains is controlled by the Internet Corporation for Assigned Names and Numbers \(ICANN\) 
+* ICANN has a complex history 
+	* ARPANET project – US government funded research, 1966\-1990 
+		* Developed initial versions of Internet protocols, TCP/IP, etc. 
+	* ICANN formed, incorporating IANA, September 1998 
+		* Dedicated organisation to manage domain names in the public interest, as a global multi\-stakeholder forum, as the Internet started to become widely deployed and commercialised 
+
+* ICANN has a complex governance model:  
+Board of governors; generic names supporting organisation – gTLDs; country code names supporting organisation – ccTLDs; address supporting organisation – regional Internet registries; governmental advisory committee – representatives from each of the 112 UN\-recognised countries; at\-large advisory committee; root server advisory committee; security and stability advisory committee; and technical liaison group  
+* ICANN is political– many countries and organisations want to influence how domain names are managed and allocated
+
+#### Top\-Level Domains
+
+* There are four types of top-level domain: 
+	* Country code top\-level domains \(ccTLDs\) 
+	* Generic top\-level domains \(gTLDs\) 
+	* Infrastructure top\-level domains 
+	* Special\-use top\-level domains
+
+* DNS includes Country Code Top\-Level Domains \(ccTLDs\) 
+	* ISO standard 3166\-1 defines two\-letter country names 
+		* Member states of the United Nations, UN special agencies \(ITU, IMF, UNESCO, WHO, ...\), parties to the International Court of Justice
+	* Every code included in ISO 3166\-1 is added to the DNS root zone 
+		* Each country has it’s own policy for sub\-domains of the CCTLD
+		* Exceptions: 
+			* .gb – The UK should use .gb to match ISO 3166\-1 
+			* .su – The domain for the Soviet Union still exists and accepts new registrations
+			* .eu – The EU is not an ISO 3166\-1 country, but has a ccTLD
+			* .oz – Australia, sadly, changed from .oz to .au
+
+* DNS also includes Generic Top\-level Domains \(gTLDs\) 
+	* Core set of gTLDs: 
+		* .com, .org, .net – unrestricted use
+		* .edu – higher educational organisations \(restricted use; primarily US\-based\)
+		* .mil – US military 
+		* .gov – US government 
+		* .int – International Treaty Organisations \(United National, Interpol, NATO, Red Cross, ...\) 
+	* ICANN has since massively expanded the set of gTLD registrations 
+		* \~1,500 gTLDs registered 
+		* e.g., .scot is a gTLD
+
+* The infrastructure top\-level domain, .arpa, is a historical relic 
+	* Used in the transition from the ARPANET – the precursor to the Internet 
+	* It has one current use: reverse DNS 
+* Forward DNS lookup: 
+
+URL \-\> DNS \-\> IP
+
+* Reverse DNS lookup:
+
+IP \-\> DNS \-> URL
+
+* Six special\-use domains exist: 
+	* .example – examples and documentation \(example.com, example.org, etc., also exist\) 
+	* .invalid – guaranteed never to exist
+	* .local – represents the local network 
+	* .localhost – represents the local machine
+	* .onion – gateway to Tor hidden services 
+	* .test – for testing
+
+#### Internationalised DNS
+
+* DNS names should be available in any language 
+	* Initial TLDs and sub\-domains were in ASCII, but UTF\-8 ought to be allowed 
+	* DNS should, in principle, work with UTF\-8 name – in practice it doesn’t, due to protocol ossification
+* Internationalised DNS works around this by translating non\-ASCII names into ASCII: 
+	* Punycode
+		* Encodes any unicode text as a sequence of ASCII letters, digits, and hyphens 
+		* München → Mnchen\-3ya
+		* Bahnhof München\-Ost → Bahnhof Mnchen\-Ost\-u6b
+		* Part after final hyphen is a base\-36 \(a\-z0\-9\) encoded representation of a sequence of Unicode character and the locations where they should be inserted
+	* Internationalised DNS names use Punycode, prefixed with xn\-\-
+
+#### The DNS Root 
+
+* ICANN decides the set of legal top\-level domains – the root servers then advertise the name servers for these domains 
+
+* What are the root servers? 
+	* The set of 13 servers that advertise the name servers for the top level domains 
+		* a.root\-servers.net → m.root\-servers.net
+		* Also have well\-known IPv4 and IPv6 addresses 
+	* Why 13 servers? 
+		* Want to be able to ask a DNS resolver to return a list of the root servers 
+		* DNS over UDP has a size limit on relies → 13 root servers is all that will fit into a single UDP packet
+
+* Heavily US\-based, for historical reasons – discussed later 
+* The IP addresses of root servers cannot be changed – they’re too widely known – who operates the root servers could change
+
+* There are not really 13 servers → anycast routing
+* Same IP address advertised from multiple places in the network – which replica you reach depends where you’re located 
+* There are 13 IP addresses used by the root servers, but many more physical servers
+
+#### DNS Security
+
+* DNS has historically been completely insecure 
+	* Requests and responses delivered via unencrypted and unauthenticated protocol
+	* Responses do not include a digital signature to verify authenticity of data 
+* Trivial to eavesdrop on who is looking up what name 
+* Trivial for on\-path attackers, or malicious resolvers, to forge replies 
+
+* Two approaches to securing DNS: 
+	* Transport security
+		* Make DNS requests, and receive replies, over TLS \(or some other secure channel\) 
+		* Requests are responses are encrypted, so can’t be understood or modified by attacker 
+		* If you trust the resolver, this protects against attack
+
+* Two approaches to securing DNS: 
+	* Transport security
+	* Record security – DNSSEC
+		* Add a digital signature to DNS responses that client can verify to check the data is valid
+			* ICANN signs the root zone
+			* Root servers sign information they provide about TLDs
+			* TLDs sign information they provide about sub\-domains 
+		* Allows a client to verify signatures back to the root, providing a chain of trust to demonstrate ownership of a domain – protects against malicious resolvers 
+		* Makes extensive use of public key cryptographic techniques – details are complex 
+		* Implemented, but not widely used 
+* Need both transport and record security for fully secure DNS
+
+#### DNS Over UDP 
+
+* DNS queries generally made over UDP port 53
+	* Requests and responses are generally small enough to fit into a single packet 
+	* TCP reliability isn’t needed – if no answer, retransmit the request
+	* Congestion control isn’t needed – can’t adjust the rate you send a single packet
+
+* Question section:
+	* List of domain names and requested record type  
+	* e.g., what is the AAAA record for domain csperkins.org
+	* Can include more than one question
+
+* Answer, authority, and additional information sections: 
+	* List of domain names and record type, record data, and time\-to\-live 
+	* Answer section answers a question made in a previous request 
+		* e.g., the AAAA record for domain csperkins.org is 2a00:1098:0:86:1000::10 and it’s valid for 1 hour 
+	* Authority describes where the answer came from
+
+_The dig tool on Linux or macOS performs DNS queries._
+
+#### DNS Over TLS \(DoT\)
+
+* DNS over UDP is insecure 
+	* The packets are not encrypted or authenticated 
+	* Devices on the path between client and resolver can see DNS queries and responses – and can forge responses 
+* DNS over TLS solves this problem 
+	* DNS client opens a TCP connection to the resolver \(port 853\) 
+	* DNS client and resolver negotiate a TLS 1.3 session on the TCP connection 
+	* DNS client sends query, and receives response, over the TLS connection 
+		* DNS over TLS messages are formatted exactly the same as DNS over UDP, and contain exactly the same information – only difference is that they’re sent over TLS not UDP 
+		* Slower and higher overhead than DNS over UDP – due to need to negotiate TCP and TLS –but more secure
+
+#### DNS over HTTPS \(DoH\)
+
+* DoH allows a client to send queries to a resolver using HTTPS 
+	* Can use with either GET or POST methods in HTTPS 
+* HTTP response has Content\-Type: application/dns\-message and contains the exact same data that would be sent in a UDP\-based DNS response
+
+#### DNS over QUIC \(DoQ\)
+
+* Work in progress to define DNS over QUIC: 
+	* Same principle as DNS over TLS:  
+		* Client opens a QUIC connection to the resolver 
+			* Negotiates TLS security as part of the connection setup 
+		* Sends the request and receives the response over that connection 
+			* Requests and response contain exactly the same data as DNS over UDP – just sent via QUIC
+
+#### Methods for DNS Resolution
+
+* Increasingly many ways of making DNS queries: 
+	* DNS over UDP
+	* DNS over TLS
+	* DNS over HTTPS 
+	* DNS over QUIC 
+* The contents of the query and the response are identical in all cases
+	* They change how the query is delivered to the resolver and how the response is returned, but not the contents of the messages
+	* They change the security guarantees provided
+	* They potentially gives clients more flexibility to query different resolvers
+
+#### Implications of Choice of DNS Resolver 
+
+* How is the DNS resolver chosen?
+* When connecting to network, hosts use DHCP \(dynamic host configuration protocol\) to discover network settings and configuration
+	* DHCP tells the host what DNS resolver to use for the network  
+	* If a host has multiple network interfaces, it may use a different DNS resolver for each 
+		* The getaddrinfo\(\) call takes a hints parameter, that can include the local IP address 
+		* e.g., consider a device connected to 4G cellular network and a private company Ethernet – the Ethernet might make available names of internal services that aren’t accessible to the public
+* Possible to configure the DNS resolver manually 
+	* e.g., to talk to Google public DNS resolver \(IPv4 address 8.8.8.8\)
+
+* DNS resolution has typically been a system\-wide service
+	* Operating system implements a DNS resolution service; all DNS queries use that service 
+	* A consistent mapping of names to addresses
+* DoH is changing this
+	* JavaScript web applications can now easily perform DNS queries via any HTTP website
+	* Each application may get different answers for the same query, depending on the server; it’s no longer easily possible to enforce policy via the DNS
+
+* Giving applications ability to securely access arbitrary DNS servers allows them to avoid local observation and/or filtering of DNS traffic
+* Is this flexibility for each application to perform DNS queries differently a concern?
+	* No
+		* Applications should have the ability to use a secure DNS server they trust to avoid phishing attacks, malware, monitoring, etc.
+		* Why should network operators be able to see DNS queries and modify responses? This is a privacy and security risk
+	* Yes
+		* Network operators filter DNS responses to block access to malicious sites and prevent malware spreading – allowing applications to bypass this is a security risk
+		* Network operators filter DNS responses to enforce legal or societal constraints – e.g., Internet Watch Foundation DNS block list to stop UK\-based access to sites hosting child sexual abuse material
+
+* Can a network restrict the choice of DNS resolver?
+* Firewalls can block access to DNS\-over\-UDP and DNS\-over\-TLS resolvers 
+	* Block access to UDP port 53 
+	* Block access to TCP port 853
+	* For all destination IP addresses except those of allowed DNS resolvers 
+* Difficult to block DNS\-over\-HTTPS
+	* Network cannot distinguish DNS\-over\-HTTPS from any other traffic over HTTPS
+	* May be able to tell from the destination IP address
+		* e.g., Google use IPv4 address 8.8.8.8 for public DoH services, but not other traffic
+	* But if a web server handles a mix of web and DNS traffic over HTTPS, cannot block one without blocking the other
+	* Many ISPs and governments concerned that DoH prevents use of DNS as a control point
+
+#### Intellectual Property and the DNS
+
+* Intellectual property is managed on a national basis
+	* e.g., a company might own a trademark in the UK while a different company owns the same trademark in the Republic of Ireland
+	* Which of those companies owns trademark.ie and which owns trademark.co.ukis a straightforward legal question
+	* Which of those companies owns trademark.com is likely harder to decide
+		* Especially since .com is operated by a US-based organisation, and a third company might own the trademark in the US
+
+* A ccTLD clearly operates under legal regime of a particular country 
+* Use of a gTLD might lead to legal complications
+
+#### What Domains Should Exist?
+
+* Should a particular gTLD be allowed to exist? 
+
+* For example, should .xxx exist to host “adult” content?
+	* If so, who gets to decide what content should \(must?\) sit within that gTLD? 
+	* Different countries have very different norms and standards in this area
+* Who controls what TLDs ICANN permits? Who should control it?
+
+#### What Domains Should Exist?
+
+* Should a particular subdomain be allowed to exist? 
+
+* Significant differences around freedom of speech and permissible topics in different parts of the world
+* A ccTLD can enforce local conventions and rules 
+* What rules apply to a gTLD?
+	* If a particular country/group finds a site objectionable, should it be taken down? 
+	* If country X decides particular content is illegal, but it is legal in country Y, should a gTLD operated out of country Y but accessible in country X permit such content? 
+	* e.g., Holocaust denial is illegal in Germany but not in the US – should .com, operating from the US, permit sites hosting such content?
+
+#### Who Controls the Root Servers?
+
+* DNS root servers are mostly controlled by US\-based organisations
+* Is this a risk for other countries?
+* Should the root servers be controlled by a broader mix of countries? 
+	* If so, who gets to decide – ICANN? The UN? 
+	* Is there a benefit in controlling a DNS root server?  
+	* Is there a benefit in controlling a gTLD server?Who gets to host .com, for example?
+
+#### Should There Be a Single DNS Root?
+
+* Should all TLDs be accessible from everywhere?
+	* Should there be a single global DNS?
+	* Should the same name always resolve to the same site?
+		* With global content distribution networks, how can you tell? 
+	* Should different countries be allowed to filter DNS? 
+		* If so, how should such restrictions be implemented?
+		* It is difficult to distinguish modifications to DNS responses made to conform to government-mandated filtering requirements from those made by malware, phishing attacks, etc. – is this a feature or a bug?
+
+## Week 9
+
+#### Content Distribution Networks \(CDNs\)
+
+* Content distribution networks \(CDNs\) provide scalability, load balancing, and low latency 
+	* Host content for their customers in web caches spread around the world in edge networks and data centres
+	* Reduces load on the main servers – rather than keep a local copy of the files, they link to the CDN\-hosted copy
+	* Reduces latency to respond to requests
+	* Reduces chances of successful denial\-of\-service attack 
+* Many commercial CDNs available
+* Many large organisations run their own 
+	* Hypergiants such as Google, Facebook, Netflix, ...
+
+#### Using CDNs to Distribute Load
+
+* CDNs distribute load by locating web caches around the world and answering most requests from a local cache
+* Needs extensive investment, large-scale cooperation with ISPs, Internet Exchange Points, etc. 
+* Mutual benefit for an ISP to host the servers for a CDN
+	* Reduces the load on the ISP’s network
+		* One copy of the content sent to cache; the cache then distributes many times
+		* Avoids overload of link from ISP to outside world 
+		* e.g., Netflix distribute “tens of terabits per second” of video – not possible from a single data centre; needs local fanout
+	* Increases the reach and robustness of the CDN
+
+#### Using CDNs to reduce latency
+
+* Key CDN benefit is reducing latency → content is delivered from nearby caches 
+	* e.g., requests to a US\-based service are answered from a CDN cache in Europe, rather than having to cross long-distance path to the US
+* Requires global distribution of CDN proxy caches
+	* Are CDNs effectively serving the entire world?
+	* Providing effective Internet access to developing regions requires more than just connectivity; also needs data centres and infrastructure to host the CDN nodes
+* Effective for cacheable static content – video, software updates, images – may need edge compute infrastructure to support other applications
+
+#### Locating the Nearest CDN Node using DNS
+
+* Locate nearest CDN node using the DNS
+* Each resource hosted by the CDN has a unique DNS name – each resource is given a different domain name
+* DNS server for the CDN returns different A or AAAA records for a name, depending on where it’s requested from, what CDN caches have the data 
+	* Directs to local cache based on IP address of resolver making the query 
+		* DNS client subnet extension \[RFC7871\] for remote resolvers 
+	* Doesn’t need to be particularly accurate – trying to figure out if you’re in UK rather than US, to direct you to data centre in London rather than New York 
+	* Allows very fine\-grained control, but puts high load on DNS
+
+#### Locating the Nearest CDN Node using Anycast Routing
+
+* Locate nearest CDN node using anycast routing
+* Each resource hosted by the CDN has a unique filename
+	* The DNS name always maps to the same IP address – that IPaddress is a load balancer at the entrance to a data centre
+* The CDN uses multiple data centres – all using the same IP addresses
+	* Each data centre advertises its addresses via BGP 
+	* Inter\-domain Internet routing will ensure traffic goes to the closest data centre to source
+
+#### Inter\-domain Routing
+
+* The Internet is a network of networks 
+	* Each network is an Autonomous System \(AS\)
+	* Each network is a separate routing domain
+* Inter\-domain routing is the problem of finding the best path from the source network to the destination network 
+	* Treat each network as a node on the routing graph \(the “AS topology graph”\) 
+	* Treat connections between networks as edges in the graph 
+	* What is the best set of networks to choose to get from source to destination
+
+#### Autonomous Systems
+
+* An Autonomous System \(AS\) is an independently operated network
+	* An Internet service provider, or other organisation, that operates a network and wants to participate in interdomain routing 
+	* Some organisations operate more than one AS
+		* For ease of administration
+		* Due to company mergers 
+	* Each AS is identified by a unique number, allocated by the RIR
+		* 114685 AS numbers allocated as of 6 March 2021; of these 70,926 are advertised in BGP 
+
+#### AS\-level Internet Topology Graph \(IPv4\)
+
+* AS\-level topology – what are the inter-AS connections? 
+	* Each node is an autonomous system
+		* Position around circle based on geographic location 
+		* Distance from centre based on number of links to other networks → more links, closer to the centre
+	* Edges show links between autonomous systems
+		* A potential route traffic can flow
+		* Not all possible routes are in use
+
+#### Differences Between IPv4 & IPv6 AS\-level Topologies
+
+IPv6 AS\-level topology graph is sparse compared to IPv4, but there is significant IPv6 usage → IPv4 has 30 years head start on deployment; the topology can be expected to be more densely interconnected.
+
+#### Routing at the Edge
+
+* Devices at the edge tend to have simple routing tables 
+	* The devices on the local network
+	* A default route for everything else
+
+#### Routing in the Core of the Internet 
+
+* Networks near the edge can often use a default route for much of their traffic
+* Core networks need full routing table
+	* The default free zone \(DFZ\) 
+	* With enough interconnections, they must store routing information about the broad network topology 
+	* Many possible paths – need information to choose the most appropriate
+* AS\-level topology flattening → increasingly rich interconnections
+* Internet Exchange Points \(IXPs\) are becoming commonplace 
+	* Example: London Internet Exchange 
+	* \>850 different networks interconnected 
+	* \>4.3 Tbps of traffic
+
+#### Routing Policy
+
+* Interdomain routing is between competitors
+	* Each AS is independently operated and may compete for customers 
+	* Business, political, and economic relationships influence routing
+* Routing must consider policy
+	* Policy restrictions on who can determine the network topology
+	* Policy restrictions on which route traffic should follow between a particular source and destination
+	* Policy restrictions might prioritise non\-shortest path routes 
+		* Do you prioritise cost, bandwidth, or latency when choosing a route?
+		* Traffic between certain networks may be prohibiting from passing through other networks 
+		* Traffic between certain regions should avoid other regions
+
+#### Border Gateway Protocol \(BGP\)
+
+* Internet routing uses the Border Gateway Protocol \(BGP\)
+	* External BGP \(eBGP\) used to exchange routing information between ASes
+		* An eBGP session is used by an AS to exchange information about the AS\-level topology with a neighbouring AS
+		* Runs over a TCP connection between two routers, one in each AS
+		* Exchanges knowledge of the AS\-level topology of the network, filtered according to policy 
+		* Used to compute appropriate interdomain routes to each destination AS 
+	* Internal BGP \(iBGP\) propagates this information to routers within an AS 
+		* An intra\-domain routing protocol determines routes within the AS 
+		* iBGP distributes information to internal routers on how to reach external destinations
+
+#### Routing Information Exchanged in eBGP
+
+* eBGP routers advertise lists of IP address ranges \(“prefixes”\) and their associated AS\-level paths
+* Combined to form a routing table
+
+#### Routing Policy in eBGP
+
+* Each AS chooses what routes to advertise to its neighbours 
+* Doesn’t need to advertise everything it receives
+	* Usual to drop some routes from the advertisement – depends on the chosen routing policy
+	* Common approach: the Gao\-Rexford rules:
+		* Gao\-Rexford rules specify what routes are advertised, not how traffic is forwarded – difference between control plane and data plane
+		* Resulting graph is valley\-free DAG: traffic flows up to common provider, then down
+		* Designed to optimise profit, not routing efficiency – don’t advertise expensive routes
+
+#### BGP Routing Decision Process 
+
+* Each AS exchanges routing information with neighbours 
+	* AS\-level topology information, filtered based on policies applied by each AS 
+	* Gives a partial view of AS\-level network topology
+* Each AS applies policy to choose what routes to use:
+	* Choose what route to install in forwarding table for each destination prefix
+	* BGP may not find a route, even if one exists since it may be prohibited by policy 
+	* Routes are often not the shortest AS path \- shortest policy\-compliant path
+* Each AS applies policy to determine what routes to advertise to neighbours 
+	* Filter out routes the neightbour should not use \(e.g., Gao\-Rexford rules, and other reasons\)
+	* De\-prioritse certain other routes
+	* Tag routes for special processing where business agreements exist 
+	* Mapping business goals to BGP policies is poorly documented → many operational secrets
+* BGP exchanges routes between autonomous systems
+	* Policy, economic, and political concerns outweigh shortest path in many cases 
+	* Routing is between competitors – there is little trust and little public data
+	* The BGP decision process is public – the input data is not, making it difficult to evaluate how routing decisions are made
+
+#### Internet Routing is not Secure
+
+* Any AS participating in BGP routing can announce any address prefix – whether or not they own it
+	* Sometimes this is accidental
+	* Sometimes this is malicious 
+* Result is that traffic is misdirected: BGP hijacking
+	* Security risk if traffic can be misdirected 
+	* Accidental hijacking is a serious stability problem for the network
+
+#### Resource Public Key Infrastructure \(RPKI\)
+
+* RPKI is an attempt to secure Internet routing 
+* Lets an AS make a signed Route Origin Authorisation\(ROA\) – a digital signature, announced via BGP, proving the AS is authorised to announce a IP address prefix 
+	* Hierarchical delegation: RIR → provider AS → customer AS
+	* Allows a router to validate whether a prefix announcement is authorised – hijacked prefixes will not have a valid signature
+	* Becomes part of BGP policy: prefer signed prefixes 
+* As of 2019, about \~12% of IPv4 addresses are covered by prefixes with valid digital signatures, but growing rapidly 
+
+#### Mutually Agreed Norms for Routing Security \(MANRS\)
+
+* Mutually Agreed Norms for Routing Security \(MANRS\) project aims to improve routing security
+	* Filtering
+	* Anti\-spoofing
+	* Coordination 
+	* Global validation via RKPI 
+	* Combination of signed route advertisements via RKPI to catch malicious attacks, with best practises for route filtering, anti\-spoofing, and coordination between ISPs to protect against misconfigurations
+
+#### Intra\-domain Unicast Routing
+
+* BGP gives information on the path to reach other networks 
+* How to route traffic within an AS? 
+	* Single trust domain 
+		* No policy restrictions on who can determine network topology
+		* No policy restrictions on which links can be used
+	* Desire efficient routing → shortest path
+		* Make best use of the network you have available
+	* Two approaches
+		* Distance vector – the Routing Information Protocol \(RIP\) 
+		* Link state – Open Shortest Path First routing \(OSPF\)
+
+#### Distance Vector Routing
+
+* Nodes maintain a vector containing the distance to every other node in network 
+	* Periodically exchanged with neighbours, eventually every node know distance and next hop to every other node
+* Packets forwarded on shortest path to destination 
+* Not widely used in practice: 
+	* Slow to converge in normal operation
+	* Count\-to\-infinity problem makes this worse on failure in networks containing loops
+
+#### Link State Routing
+
+* Nodes know the links to their neighbours, and cost of using those links – link state information
+	* Flood this information throughout the network on startup, and whenever a link is added or removed 
+		* Send address of node sending the update, the list of directly connected neighbours and costs for link usage, and message sequence number 
+		* Sequence numbers prevent loops 
+	* Each node then directly calculates shortest path to every other node, uses as routing table
+* Flooding link state data from all nodes ensures all nodes know the entire topology 
+	* Each node uses Dijkstra’s shortest\-path algorithm to calculate optimal route to every other node
+	* Optimal is assumed to be the shortest path, by cost
+
+#### Distance Vector vs. Link State
+
+* Distance vector routing: 
+	* Simple to implement 
+	* Routers only store the distance to each other node: O\(n\)
+	* Suffers from slow convergence
+* Link State routing: 
+	* More complex
+	* Requires each router to store complete network map: O\(n<sub>2</sub>\)
+	* Much faster convergence
+
+Slow convergence times make distance vector routing unsuitable for large networks
+
+#### Challenges in Intra\-domain Routing
+
+* How to rapidly recover from link failures? 
+	* Construction work surprisingly good at breaking network cables;trawlers do similar damage to undersea cables 
+	* Good network designs have multiple paths from source to destination
+	* Must quickly notice failure and switch to backup path 
+		* If the link is used for telephony or video streaming, this must happen in <1/60<sup>th</sup> of a second else it interrupts the speech or video playout
+	* Fast failover – pre\-calculate alternative paths to allow rapid switchover 
+* How to balance load across multiple paths? 
+	* Equal cost multipath routing – if two paths with the same cost, alternate traffic between them 
+	* Care needed: TCP uses a triple duplicate ACK to signal loss so is insensitive to small amount of packet re\-ordering, but treats large amounts of reordering as loss and slows down 
+	* RTP applications don’t care about order, as long as packets arrive before deadline
+
+## Week 10
+
+#### Evolving the Network
+
+* The course has focussed on how can the Internet change and evolve to address coming challenges:
+	* How to establish connections in a fragmented network? 
+	* How can encryption protect against pervasive monitoring and prevent transport ossification? 
+	* How can we reduce latency and support real\-time and interactive content?  
+	* How can we adapt to the vagaries of wireless networks?  
+	* How can we identify and distribute content? How can we manage the tussle for control of the DNS and naming?  
+	* How can we manage interdomain routing to efficiently delivery content? 
+	* How can we re\-decentralise the network?
+
+* To address these challenges, the Internet is in the middle of a significant change
+	* IPv6 as a basis for routing and forwarding evolution 
+	* TLS 1.3 to simplify and improve security 
+	* QUIC as a basis for future transport evolution, avoiding protocol ossification 
+	* HTTP/3 as a basis for web evolution 
+	* DNS over encryption \(HTTPS, TLS, QUIC\) for secure name resolution 
+	* CDNs and overlays
+
+#### Long\-term Evolution of the Network
+
+* The Internet Research Task Force \(IRTF\) promotes evolution of the Internet through applied, longer\-term, research on Internet protocols, applications, architectures, and technology
+
+#### IRTF Activities
+
+* Organised around longer\-term research groups 
+* A forum where researchers and engineers can explore the feasibility of research ideas 
+* A venue where researchers can learn from the engineers who build and operate the Internet – and where the standards, implementation, and operations community can learn from research
+
+#### Security, Privacy, and Human Rights
+
+* Begin to understand how Internet protocols and standards impact human rights and privacy – at the Internet infrastructure level 
+* Discuss interplay between security mechanisms, privacy, and human rights; seek to raise awareness of broader societal and policy issues to the IETF community
+
+#### Computation in the Network
+
+* Speculative new architectures for an internet, emphasising named data or named functions
+	* Generalisation of content distribution networks and web caching infrastructure – mature work, with competing experimental implementations 
+	* Generalisation of lambda functions and “server\-less” computation – early stage research 
+* Long\-term replacements for the Internet? 
+* Does it make sense to re\-architect the network around content or computation? To replace IP addresses with content names? 
+* What are the implications of such a change for the content provider/consumer relationship – democratisation or ossification of current roles?
+
+#### Path Aware Networking
+
+* Can we benefit from making applications and transport protocols aware of the network path taken – or by making the network path aware of the application or transport?
+* Introduces a new control point for operators; questions around trust, privacy, and network neutrality are poorly understood 
+* IETF community seems determined to enter a standardisation phase: SRv6, APN, ... 
+* IRTF considering broader questions around privacy, security, path definitions, incentives
+
+#### Designing the Quantum Internet
+
+* How to establish and control inter\-domain paths that can distribute entangled quantum state?
+	* Quantum key distribution for security 
+	* Distributed quantum computation 
+	* Quantum entanglement as a service
+* Architecture and approach generally well defined 
+	* Classical control plane 
+	* Managed distribution of entangled quantum state 
+* Entering a phase of experimentation to validate the architecture, develop prototypes
+
+#### Global Access and Sustainability
+
+* How to address the global digital divide? 
+	* To share experiences and best practices, foster collaboration, in building, deploying and making effective use of the Internet in rural, remote, or under\-developed regions 
+	* To create increased visibility and interest among the wider community on the challenges and opportunities in enabling global Internet access, in terms of technology as well as the social and economic drivers for its adoption 
+	* To create a shared vision among practitioners, researchers, corporations, non governmental and governmental organisations on the challenges and opportunities
+* Sharing expertise, raising awareness of global access challenges
+
+#### Advanced Protocol Development
+
+* Measuring and understanding network behaviour 
+* Interfacing between research and standards community to: 
+	* Develop and validate new congestion control and network coding algorithms in the real world 
+	* Develop intent\-and AI\-based approaches to network management 
+	* Understand issues of trust\- and identity\- management, name resolution, resource/asset ownership, and resource discovery in decentralised infrastructure 
+	* Understand research challenges in IoT based on initial real\-world deployment experience
+
+#### Future Directions
+
+* The Internet is not finished – the protocols and fundamental design are still evolving 
+* With the introduction of IPv6 and QUIC, we see a significant change in network design 
+* Coming changes are potentially even more significant
+
